@@ -198,13 +198,12 @@ export default function SmartConverter() {
           console.error('Calculation error:', e)
           alert('שגיאה בחישוב - בדוק נתונים')
         }
+      } catch (e) {
+        console.error('Calculation error:', e)
+        alert('שגיאה במשיכת שערים - בדוק חיבור אינטרנט')
+      } finally {
+        setLoading(false)
       }
-    } catch (e) {
-      console.error('Calculation error:', e)
-      alert('שגיאה במשיכת שערים - בדוק חיבור אינטרנט')
-    } finally {
-      setLoading(false)
-    }
   }
 
   const copyToClipboard = () => {
