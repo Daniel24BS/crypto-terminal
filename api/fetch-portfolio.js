@@ -15,10 +15,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { apiKey, apiSecret } = req.body
+    // Use server-side environment variables
+    const apiKey = process.env.BYBIT_API_KEY
+    const apiSecret = process.env.BYBIT_API_SECRET
 
     if (!apiKey || !apiSecret) {
-      res.status(400).json({ error: 'API keys not provided' })
+      res.status(500).json({ error: 'API keys not configured on server' })
       return
     }
 

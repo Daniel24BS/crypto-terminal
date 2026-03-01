@@ -112,28 +112,26 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     }
   }, []) // Empty dependency array ensures this runs only on mount
 
-  const refreshPortfolio = async () => {
-    if (!apiKey || !apiSecret) {
-      setError('API keys not provided')
-      return
+  // Auto-set connected state when fetch is successful
+  useEffect(() => {
+    if (balances && !loading) {
+      setIsConnected(true)
     }
+  }, [balances, loading])
 
+  const refreshPortfolio = async () => {
     setLoading(true)
     setError('')
 
     try {
-      // ONLY use our internal API - no external proxies
+      // Call our internal API - keys are now server-side
       console.log("Calling internal API: /api/fetch-portfolio")
       
       const response = await fetch('/api/fetch-portfolio', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          apiKey,
-          apiSecret
-        })
+        }
       })
 
       if (!response.ok) {
