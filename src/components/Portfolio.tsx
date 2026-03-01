@@ -72,11 +72,22 @@ export default function Portfolio() {
     return `${num.toFixed(6)} ${symbol}`
   }
 
+  console.log("PORTFOLIO STATE:", { balances, loading, error, isConnected })
+
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-2">💼 Portfolio</h1>
         <p className="text-gray-400">Track your cryptocurrency investments</p>
+      </div>
+
+      <div style={{ border: '5px solid red', padding: '20px', margin: '20px', color: 'white', backgroundColor: 'black' }}>
+        <h2>🚨 DEBUG BOX 🚨</h2>
+        <p>If you see this, component is rendering!</p>
+        <p>isConnected: {isConnected ? 'true' : 'false'}</p>
+        <p>loading: {loading ? 'true' : 'false'}</p>
+        <p>error: {error || 'none'}</p>
+        <p>balances: {balances ? 'exists' : 'null'}</p>
       </div>
 
       {!isConnected ? (
