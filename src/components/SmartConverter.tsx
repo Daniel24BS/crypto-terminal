@@ -45,47 +45,27 @@ export default function SmartConverter() {
 
   const initRate = async () => {
     try {
-      // Try multiple proxy strategies for maximum reliability
-      const apiUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils'
-      const proxies = [
-        `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(apiUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
-        apiUrl // Direct fetch as last resort
-      ]
+      // Get ILS rate from our server API
+      console.log("Fetching ILS rate from server...")
+      const response = await fetch('/api/fetch-portfolio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
 
-      let data = null
-      let lastError = null
-
-      for (const proxyUrl of proxies) {
-        try {
-          console.log("Trying ILS proxy:", proxyUrl)
-          
-          const res = await fetch(proxyUrl)
-          
-          if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`)
-          }
-          
-          const responseData = await res.json()
-          
-          if (responseData?.tether?.ils) {
-            setBaseExchangeRate(responseData.tether.ils)
-            console.log("SUCCESS with ILS proxy:", proxyUrl, responseData.tether.ils)
-            return // Success, exit the function
-          } else {
-            throw new Error('Invalid data structure')
-          }
-        } catch (e) {
-          console.error(`Failed with ILS proxy ${proxyUrl}:`, e)
-          lastError = e
-          continue // Try next proxy
+      if (response.ok) {
+        const data = await response.json()
+        if (data?.ilsRate) {
+          setBaseExchangeRate(data.ilsRate)
+          console.log("SUCCESS: ILS rate from server:", data.ilsRate)
+          return
         }
       }
-
-      // All proxies failed, use fallback
-      throw lastError || new Error('All proxies failed')
+      
+      throw new Error('No ILS rate in server response')
     } catch (e) {
-      console.error('Failed to fetch ILS rate:', e)
+      console.error('Failed to fetch ILS rate from server:', e)
       // FALLBACK: Set a reasonable default rate so app doesn't crash
       console.log('Using fallback ILS rate: 3.65')
       setBaseExchangeRate(3.65)

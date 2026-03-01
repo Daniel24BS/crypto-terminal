@@ -24,6 +24,22 @@ export default async function handler(req, res) {
       return
     }
 
+    // Fetch ILS rate from CoinGecko on server-side
+    let ilsRate = 3.65 // fallback
+    try {
+      const ilsResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils')
+      if (ilsResponse.ok) {
+        const ilsData = await ilsResponse.json()
+        if (ilsData?.tether?.ils) {
+          ilsRate = ilsData.tether.ils
+          console.log("Fetched ILS rate from server:", ilsRate)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch ILS rate on server:", error)
+      // Keep fallback rate
+    }
+
     // Fetch portfolio data from Bybit API
     const apiUrl = 'https://api.bybit.com/v5/account/wallet-balance'
     const timestamp = Date.now().toString()
@@ -48,7 +64,11 @@ export default async function handler(req, res) {
     const data = await response.json()
     console.log("Bybit API response:", data)
 
-    res.status(200).json(data)
+    // Return both portfolio data and ILS rate
+    res.status(200).json({
+      ...data,
+      ilsRate
+    })
   } catch (error) {
     console.error('Portfolio fetch error:', error)
     res.status(500).json({ 

@@ -159,12 +159,15 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
           sum + balance.usdValue, 0
         )
 
+        // Use ILS rate from server response
+        const serverIlsRate = data.ilsRate || 3.65
+
         setBalances({
           unified: unifiedBalances,
           fund: [],
           totalUSD,
-          totalILS: totalUSD * usdToIlsRate,
-          usdToIlsRate
+          totalILS: totalUSD * serverIlsRate,
+          usdToIlsRate: serverIlsRate
         })
         setIsConnected(true)
       } else {
