@@ -104,25 +104,53 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     setError('')
 
     try {
-      // Fetch portfolio data with reliable CORS proxy
+      // Try multiple proxy strategies for maximum reliability
       const apiUrl = 'https://api.bybit.com/v5/account/wallet-balance'
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`
-      
-      console.log("RAW DATA FROM PROXY:", proxyUrl)
-      
-      const response = await fetch(proxyUrl, {
-        headers: {
-          'X-BAPI-API-KEY': apiKey,
-          'X-BAPI-SIGN': apiSecret,
-          'X-BAPI-SIGN-TYPE': '2',
-          'X-BAPI-TIMESTAMP': Date.now().toString(),
-          'X-BAPI-RECV-WINDOW': '5000',
-          'Content-Type': 'application/json'
-        }
-      })
+      const proxies = [
+        `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(apiUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
+        apiUrl // Direct fetch as last resort
+      ]
 
-      const data = await response.json()
-      console.log("RAW DATA FROM PROXY:", data)
+      let data = null
+      let lastError = null
+
+      for (const proxyUrl of proxies) {
+        try {
+          console.log("Trying proxy:", proxyUrl)
+          
+          const headers: Record<string, string> = {
+            'X-BAPI-API-KEY': apiKey,
+            'X-BAPI-SIGN': apiSecret,
+            'X-BAPI-SIGN-TYPE': '2',
+            'X-BAPI-TIMESTAMP': Date.now().toString(),
+            'X-BAPI-RECV-WINDOW': '5000'
+          }
+          
+          // Only add Content-Type for non-proxy requests
+          if (proxyUrl === apiUrl) {
+            headers['Content-Type'] = 'application/json'
+          }
+
+          const response = await fetch(proxyUrl, { headers })
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+
+          data = await response.json()
+          console.log("SUCCESS with proxy:", proxyUrl, data)
+          break // Success, exit the loop
+        } catch (error) {
+          console.error(`Failed with proxy ${proxyUrl}:`, error)
+          lastError = error
+          continue // Try next proxy
+        }
+      }
+
+      if (!data) {
+        throw lastError || new Error('All proxies failed')
+      }
 
       if (data?.result?.list) {
         const accountData = data.result.list[0]

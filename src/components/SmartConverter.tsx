@@ -45,24 +45,49 @@ export default function SmartConverter() {
 
   const initRate = async () => {
     try {
-      // Use reliable CORS proxy to avoid browser CORS issues
+      // Try multiple proxy strategies for maximum reliability
       const apiUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils'
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`
-      const res = await fetch(proxyUrl)
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`)
+      const proxies = [
+        `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(apiUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
+        apiUrl // Direct fetch as last resort
+      ]
+
+      let data = null
+      let lastError = null
+
+      for (const proxyUrl of proxies) {
+        try {
+          console.log("Trying ILS proxy:", proxyUrl)
+          
+          const res = await fetch(proxyUrl)
+          
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`)
+          }
+          
+          const responseData = await res.json()
+          
+          if (responseData?.tether?.ils) {
+            setBaseExchangeRate(responseData.tether.ils)
+            console.log("SUCCESS with ILS proxy:", proxyUrl, responseData.tether.ils)
+            return // Success, exit the function
+          } else {
+            throw new Error('Invalid data structure')
+          }
+        } catch (e) {
+          console.error(`Failed with ILS proxy ${proxyUrl}:`, e)
+          lastError = e
+          continue // Try next proxy
+        }
       }
-      
-      const data = await res.json()
-      if (data?.tether?.ils) {
-        setBaseExchangeRate(data.tether.ils)
-      } else {
-        throw new Error('Invalid data structure')
-      }
+
+      // All proxies failed, use fallback
+      throw lastError || new Error('All proxies failed')
     } catch (e) {
       console.error('Failed to fetch ILS rate:', e)
       // FALLBACK: Set a reasonable default rate so app doesn't crash
+      console.log('Using fallback ILS rate: 3.65')
       setBaseExchangeRate(3.65)
     }
   }
@@ -112,19 +137,49 @@ export default function SmartConverter() {
     setResult(null)
 
     try {
-      // Fetch current coin rates with reliable CORS proxy
+      // Fetch current coin rates with multiple proxy strategies
       const apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${selectedCoin}&vs_currencies=ils,usd`
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`
-      const res = await fetch(proxyUrl)
-      
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`)
+      const proxies = [
+        `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(apiUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
+        apiUrl // Direct fetch as last resort
+      ]
+
+      let data = null
+      let lastError = null
+
+      for (const proxyUrl of proxies) {
+        try {
+          console.log("Trying coin proxy:", proxyUrl)
+          
+          const res = await fetch(proxyUrl)
+          
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`)
+          }
+          
+          const responseData = await res.json()
+          
+          if (responseData?.[selectedCoin]) {
+            data = responseData
+            console.log("SUCCESS with coin proxy:", proxyUrl, data)
+            break // Success, exit the loop
+          } else {
+            throw new Error('Invalid data structure')
+          }
+        } catch (e) {
+          console.error(`Failed with coin proxy ${proxyUrl}:`, e)
+          lastError = e
+          continue // Try next proxy
+        }
       }
-      
-      const data = await res.json()
-      if (data?.[selectedCoin]) {
-        const rateILS = data[selectedCoin].ils
-        const rateUSD = data[selectedCoin].usd
+
+      if (!data) {
+        throw lastError || new Error('All proxies failed')
+      }
+
+      const rateILS = data[selectedCoin].ils
+      const rateUSD = data[selectedCoin].usd
         const coin = coins.find(c => c.id === selectedCoin)!
         const symbol = coin.symbol
 
