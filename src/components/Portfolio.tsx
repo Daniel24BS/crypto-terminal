@@ -72,8 +72,6 @@ export default function Portfolio() {
     return `${num.toFixed(6)} ${symbol}`
   }
 
-  
-  
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -190,7 +188,7 @@ export default function Portfolio() {
                   💼 All Assets (Trading + Earn + Funding)
                 </h3>
                 <div className="bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto">
-                  {balances.unified.length > 0 ? (
+                  {balances.unified && balances.unified.length > 0 ? (
                     <div className="space-y-3">
                       {balances.unified.map((balance: any) => {
                         const pnl = calculatePnL(balance.coin, balance.usdValue, balance.total)
@@ -219,7 +217,6 @@ export default function Portfolio() {
                               </div>
                             </div>
                             
-                            {/* PnL Section */}
                             <div className="border-t border-gray-600 pt-3">
                               <div className="flex items-center space-x-3">
                                 <div className="flex-1">
