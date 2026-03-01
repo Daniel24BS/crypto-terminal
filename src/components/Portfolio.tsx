@@ -113,9 +113,9 @@ export default function Portfolio() {
             
             <button
               onClick={() => {
-                localStorage.setItem('bybit_api_key', apiKey)
-                localStorage.setItem('bybit_api_secret', apiSecret)
-                setIsConnected(true)
+                if (apiKey && apiSecret) {
+                  setIsConnected(true)
+                }
               }}
               disabled={!apiKey || !apiSecret}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -162,7 +162,7 @@ export default function Portfolio() {
                       onClick={refreshPortfolio}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
                     >
-                      🔄
+                      🔄 Refresh
                     </button>
                     <div className="text-sm text-gray-400 mt-2">Trading + Earn + Funding</div>
                   </div>
@@ -172,8 +172,6 @@ export default function Portfolio() {
                   <div className="text-sm text-gray-400">
                     <button
                       onClick={() => {
-                        localStorage.removeItem('bybit_api_key')
-                        localStorage.removeItem('bybit_api_secret')
                         setApiKey('')
                         setApiSecret('')
                         setIsConnected(false)
@@ -253,7 +251,9 @@ export default function Portfolio() {
                     </div>
                   ) : (
                     <div className="text-center text-gray-500 py-8">
-                      No assets found in any account
+                      <div className="text-6xl mb-4">📊</div>
+                      <p className="text-lg">No assets found in your connected wallet</p>
+                      <p className="text-sm text-gray-400 mt-2">Make sure you have funds in your Bybit account or check your API permissions</p>
                     </div>
                   )}
                 </div>
