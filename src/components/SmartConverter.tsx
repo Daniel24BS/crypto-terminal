@@ -45,16 +45,25 @@ export default function SmartConverter() {
 
   const initRate = async () => {
     try {
-      // Use CORS proxy to avoid browser CORS issues
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils')}`
+      // Use reliable CORS proxy to avoid browser CORS issues
+      const apiUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils'
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`
       const res = await fetch(proxyUrl)
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`)
+      }
+      
       const data = await res.json()
-      if (data?.contents) {
-        const parsedData = JSON.parse(data.contents)
-        setBaseExchangeRate(parsedData.tether.ils)
+      if (data?.tether?.ils) {
+        setBaseExchangeRate(data.tether.ils)
+      } else {
+        throw new Error('Invalid data structure')
       }
     } catch (e) {
       console.error('Failed to fetch ILS rate:', e)
+      // FALLBACK: Set a reasonable default rate so app doesn't crash
+      setBaseExchangeRate(3.65)
     }
   }
 
@@ -103,15 +112,19 @@ export default function SmartConverter() {
     setResult(null)
 
     try {
-      // Fetch current coin rates with CORS proxy
+      // Fetch current coin rates with reliable CORS proxy
       const apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${selectedCoin}&vs_currencies=ils,usd`
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`
       const res = await fetch(proxyUrl)
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`)
+      }
+      
       const data = await res.json()
-      if (data?.contents) {
-        const parsedData = JSON.parse(data.contents)
-        const rateILS = parsedData[selectedCoin].ils
-        const rateUSD = parsedData[selectedCoin].usd
+      if (data?.[selectedCoin]) {
+        const rateILS = data[selectedCoin].ils
+        const rateUSD = data[selectedCoin].usd
         const coin = coins.find(c => c.id === selectedCoin)!
         const symbol = coin.symbol
 

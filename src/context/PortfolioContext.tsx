@@ -104,9 +104,9 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     setError('')
 
     try {
-      // Fetch portfolio data with CORS proxy
+      // Fetch portfolio data with reliable CORS proxy
       const apiUrl = 'https://api.bybit.com/v5/account/wallet-balance'
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`
       
       console.log("RAW DATA FROM PROXY:", proxyUrl)
       
@@ -124,39 +124,32 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       const data = await response.json()
       console.log("RAW DATA FROM PROXY:", data)
 
-      if (data?.contents) {
-        const parsedData = JSON.parse(data.contents)
-        console.log("PARSED DATA:", parsedData)
+      if (data?.result?.list) {
+        const accountData = data.result.list[0]
+        const unifiedBalances = accountData.coin.filter((coin: any) => 
+          parseFloat(coin.walletBalance) > 0 || parseFloat(coin.unrealisedPnl) !== 0
+        ).map((coin: any) => ({
+          coin: coin.coin,
+          coinId: coin.coin.toLowerCase(),
+          coinName: coin.coin,
+          total: coin.walletBalance,
+          available: coin.free,
+          usdValue: parseFloat(coin.walletBalance) * (coin.usdPrice || 0)
+        }))
 
-        if (parsedData?.result?.list) {
-          const accountData = parsedData.result.list[0]
-          const unifiedBalances = accountData.coin.filter((coin: any) => 
-            parseFloat(coin.walletBalance) > 0 || parseFloat(coin.unrealisedPnl) !== 0
-          ).map((coin: any) => ({
-            coin: coin.coin,
-            coinId: coin.coin.toLowerCase(),
-            coinName: coin.coin,
-            total: coin.walletBalance,
-            available: coin.free,
-            usdValue: parseFloat(coin.walletBalance) * (coin.usdPrice || 0)
-          }))
+        const totalUSD = unifiedBalances.reduce((sum: number, balance: any) => 
+          sum + balance.usdValue, 0
+        )
 
-          const totalUSD = unifiedBalances.reduce((sum: number, balance: any) => 
-            sum + balance.usdValue, 0
-          )
-
-          setBalances({
-            unified: unifiedBalances,
-            fund: [],
-            totalUSD,
-            totalILS: totalUSD * usdToIlsRate,
-            usdToIlsRate
-          })
-        } else {
-          setError('No portfolio data found')
-        }
+        setBalances({
+          unified: unifiedBalances,
+          fund: [],
+          totalUSD,
+          totalILS: totalUSD * usdToIlsRate,
+          usdToIlsRate
+        })
       } else {
-        setError('Failed to parse proxy response')
+        setError('No portfolio data found')
       }
     } catch (error) {
       console.error('Portfolio fetch error:', error)
