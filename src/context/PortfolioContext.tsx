@@ -65,9 +65,34 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [isConnected, setIsConnected] = useState(false)
-  const [apiKey, setApiKey] = useState('')
-  const [apiSecret, setApiSecret] = useState('')
+  
+  // Initialize API keys from localStorage on mount
+  const [apiKey, setApiKey] = useState(() => {
+    return localStorage.getItem('bybit_api_key') || ''
+  })
+  const [apiSecret, setApiSecret] = useState(() => {
+    return localStorage.getItem('bybit_api_secret') || ''
+  })
   const [usdToIlsRate, setUsdToIlsRate] = useState(3.7)
+
+  // Save API keys to localStorage whenever they change
+  const handleSetApiKey = (key: string) => {
+    setApiKey(key)
+    if (key) {
+      localStorage.setItem('bybit_api_key', key)
+    } else {
+      localStorage.removeItem('bybit_api_key')
+    }
+  }
+
+  const handleSetApiSecret = (secret: string) => {
+    setApiSecret(secret)
+    if (secret) {
+      localStorage.setItem('bybit_api_secret', secret)
+    } else {
+      localStorage.removeItem('bybit_api_secret')
+    }
+  }
 
   const refreshPortfolio = () => {
     // This will be implemented in Portfolio component
@@ -86,8 +111,8 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     setLoading,
     setError,
     setIsConnected,
-    setApiKey,
-    setApiSecret,
+    setApiKey: handleSetApiKey,
+    setApiSecret: handleSetApiSecret,
     setUsdToIlsRate,
     refreshPortfolio
   }

@@ -45,9 +45,14 @@ export default function SmartConverter() {
 
   const initRate = async () => {
     try {
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils')
+      // Use CORS proxy to avoid browser CORS issues
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils')}`
+      const res = await fetch(proxyUrl)
       const data = await res.json()
-      setBaseExchangeRate(data.tether.ils)
+      if (data?.contents) {
+        const parsedData = JSON.parse(data.contents)
+        setBaseExchangeRate(parsedData.tether.ils)
+      }
     } catch (e) {
       console.error('Failed to fetch ILS rate:', e)
     }
@@ -98,66 +103,75 @@ export default function SmartConverter() {
     setResult(null)
 
     try {
-      // Fetch current coin rates
-      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${selectedCoin}&vs_currencies=ils,usd`)
+      // Fetch current coin rates with CORS proxy
+      const apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${selectedCoin}&vs_currencies=ils,usd`
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`
+      const res = await fetch(proxyUrl)
       const data = await res.json()
-      const rateILS = data[selectedCoin].ils
-      const rateUSD = data[selectedCoin].usd
-      const coin = coins.find(c => c.id === selectedCoin)!
-      const symbol = coin.symbol
+      if (data?.contents) {
+        const parsedData = JSON.parse(data.contents)
+        const rateILS = parsedData[selectedCoin].ils
+        const rateUSD = parsedData[selectedCoin].usd
+        const coin = coins.find(c => c.id === selectedCoin)!
+        const symbol = coin.symbol
 
-      if (!isInverse) {
-        // Fiat to Crypto mode
-        let profitRate = inputILS < 400 ? 0.10 : 0.15
-        let myProfitILS = Math.max(inputILS * profitRate, MINIMUM_FEE_ILS)
+        try {
+          if (!isInverse) {
+            // Fiat to Crypto mode
+            let profitRate = inputILS < 400 ? 0.10 : 0.15
+            let myProfitILS = Math.max(inputILS * profitRate, MINIMUM_FEE_ILS)
 
-        if (inputILS <= myProfitILS) {
-          setLoading(false)
-          alert(`הסכום נמוך מדי לעסקה (מכסה רק את המינימום רווח שלך שעומד על ${MINIMUM_FEE_ILS} ₪)`)
-          return
+            if (inputILS <= myProfitILS) {
+              setLoading(false)
+              alert('הסכום נמוך מדי לעסקה (מכסה רק את המינימום רווח שלך שעומד על ${MINIMUM_FEE_ILS} ₪)')
+              return
+            }
+
+            let buyBudgetILS = inputILS - myProfitILS
+            let cryptoBought = (buyBudgetILS * (1 - bybitFiatFee)) / rateILS
+            let finalToClient = cryptoBought - coin.networkFee
+            if (finalToClient < 0) finalToClient = 0
+
+            setResult({
+              resultLabel: 'נטו ללקוח (אחרי עמלות):',
+              finalResult: `${finalToClient.toFixed(5)} ${symbol}`,
+              amountToBuy: `${cryptoBought.toFixed(5)} ${symbol}`,
+              breakdown: `
+                <strong>פירוט עסקה מלא:</strong><br/>
+                • הלקוח שילם: ${formatFiat(inputILS, rateUSD / rateILS)}<br/>
+                • הרווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> ${myProfitILS === MINIMUM_FEE_ILS ? '(מינימום)' : ''}<br/>
+                • תקציב קנייה (נטו): ${formatFiat(buyBudgetILS, rateUSD / rateILS)}<br/>
+                • עמלת רשת: ${coin.networkFee} ${symbol}<br/>
+              `
+            })
+
+          } else {
+            // Crypto to Fiat mode (inverse)
+            let cryptoToBuy = inputCrypto + coin.networkFee
+            let budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
+            
+            let profitRate = budgetNeededILS < 360 ? 0.10 : 0.15
+            let calculatedProfitILS = (budgetNeededILS / (1 - profitRate)) - budgetNeededILS
+            let myProfitILS = Math.max(calculatedProfitILS, MINIMUM_FEE_ILS)
+            let totalToPayILS = budgetNeededILS + myProfitILS
+
+            setResult({
+              resultLabel: 'הלקוח צריך לשלם בסך הכל:',
+              finalResult: formatFiat(totalToPayILS, rateUSD / rateILS),
+              amountToBuy: `${cryptoToBuy.toFixed(5)} ${symbol}`,
+              breakdown: `
+                <strong>פירוט עסקה (חישוב הפוך):</strong><br/>
+                • הלקוח יקבל: ${inputCrypto} ${symbol}<br/>
+                • הרווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> ${myProfitILS === MINIMUM_FEE_ILS ? '(מינימום)' : ''}<br/>
+                • שער המטבע: 1 ${symbol} = ${rateILS.toFixed(2)} ₪ / $${rateUSD.toFixed(2)}<br/>
+              `
+            })
+          }
+        } catch (e) {
+          console.error('Calculation error:', e)
+          alert('שגיאה בחישוב - בדוק נתונים')
         }
-
-        let buyBudgetILS = inputILS - myProfitILS
-        let cryptoBought = (buyBudgetILS * (1 - bybitFiatFee)) / rateILS
-        let finalToClient = cryptoBought - coin.networkFee
-        if (finalToClient < 0) finalToClient = 0
-
-        setResult({
-          resultLabel: 'נטו ללקוח (אחרי עמלות):',
-          finalResult: `${finalToClient.toFixed(5)} ${symbol}`,
-          amountToBuy: `${cryptoBought.toFixed(5)} ${symbol}`,
-          breakdown: `
-            <strong>פירוט עסקה מלא:</strong><br/>
-            • הלקוח שילם: ${formatFiat(inputILS, rateUSD / rateILS)}<br/>
-            • הרווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> ${myProfitILS === MINIMUM_FEE_ILS ? '(מינימום)' : ''}<br/>
-            • תקציב קנייה (נטו): ${formatFiat(buyBudgetILS, rateUSD / rateILS)}<br/>
-            • עמלת רשת: ${coin.networkFee} ${symbol}<br/>
-          `
-        })
-
-      } else {
-        // Crypto to Fiat mode (inverse)
-        let cryptoToBuy = inputCrypto + coin.networkFee
-        let budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
-        
-        let profitRate = budgetNeededILS < 360 ? 0.10 : 0.15
-        let calculatedProfitILS = (budgetNeededILS / (1 - profitRate)) - budgetNeededILS
-        let myProfitILS = Math.max(calculatedProfitILS, MINIMUM_FEE_ILS)
-        let totalToPayILS = budgetNeededILS + myProfitILS
-
-        setResult({
-          resultLabel: 'הלקוח צריך לשלם בסך הכל:',
-          finalResult: formatFiat(totalToPayILS, rateUSD / rateILS),
-          amountToBuy: `${cryptoToBuy.toFixed(5)} ${symbol}`,
-          breakdown: `
-            <strong>פירוט עסקה (חישוב הפוך):</strong><br/>
-            • הלקוח יקבל: ${inputCrypto} ${symbol}<br/>
-            • הרווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> ${myProfitILS === MINIMUM_FEE_ILS ? '(מינימום)' : ''}<br/>
-            • שער המטבע: 1 ${symbol} = ${rateILS.toFixed(2)} ₪ / $${rateUSD.toFixed(2)}<br/>
-          `
-        })
       }
-
     } catch (e) {
       console.error('Calculation error:', e)
       alert('שגיאה במשיכת שערים - בדוק חיבור אינטרנט')
