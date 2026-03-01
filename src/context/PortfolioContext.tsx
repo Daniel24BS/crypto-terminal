@@ -94,9 +94,76 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     }
   }
 
-  const refreshPortfolio = () => {
-    // This will be implemented in Portfolio component
-    console.log('Portfolio refresh requested')
+  const refreshPortfolio = async () => {
+    if (!apiKey || !apiSecret) {
+      setError('API keys not provided')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      // Fetch portfolio data with CORS proxy
+      const apiUrl = 'https://api.bybit.com/v5/account/wallet-balance'
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`
+      
+      console.log("RAW DATA FROM PROXY:", proxyUrl)
+      
+      const response = await fetch(proxyUrl, {
+        headers: {
+          'X-BAPI-API-KEY': apiKey,
+          'X-BAPI-SIGN': apiSecret,
+          'X-BAPI-SIGN-TYPE': '2',
+          'X-BAPI-TIMESTAMP': Date.now().toString(),
+          'X-BAPI-RECV-WINDOW': '5000',
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+      console.log("RAW DATA FROM PROXY:", data)
+
+      if (data?.contents) {
+        const parsedData = JSON.parse(data.contents)
+        console.log("PARSED DATA:", parsedData)
+
+        if (parsedData?.result?.list) {
+          const accountData = parsedData.result.list[0]
+          const unifiedBalances = accountData.coin.filter((coin: any) => 
+            parseFloat(coin.walletBalance) > 0 || parseFloat(coin.unrealisedPnl) !== 0
+          ).map((coin: any) => ({
+            coin: coin.coin,
+            coinId: coin.coin.toLowerCase(),
+            coinName: coin.coin,
+            total: coin.walletBalance,
+            available: coin.free,
+            usdValue: parseFloat(coin.walletBalance) * (coin.usdPrice || 0)
+          }))
+
+          const totalUSD = unifiedBalances.reduce((sum: number, balance: any) => 
+            sum + balance.usdValue, 0
+          )
+
+          setBalances({
+            unified: unifiedBalances,
+            fund: [],
+            totalUSD,
+            totalILS: totalUSD * usdToIlsRate,
+            usdToIlsRate
+          })
+        } else {
+          setError('No portfolio data found')
+        }
+      } else {
+        setError('Failed to parse proxy response')
+      }
+    } catch (error) {
+      console.error('Portfolio fetch error:', error)
+      setError('Failed to fetch portfolio data')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const value: PortfolioContextType = {

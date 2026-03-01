@@ -72,8 +72,6 @@ export default function Portfolio() {
     return `${num.toFixed(6)} ${symbol}`
   }
 
-  console.log("PORTFOLIO STATE:", { balances, loading, error, isConnected })
-
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -81,55 +79,17 @@ export default function Portfolio() {
         <p className="text-gray-400">Track your cryptocurrency investments</p>
       </div>
 
-      <div style={{ border: '5px solid red', padding: '20px', margin: '20px', color: 'white', backgroundColor: 'black' }}>
-        <h2>🚨 DEBUG BOX 🚨</h2>
-        <p>If you see this, component is rendering!</p>
-        <p>isConnected: {isConnected ? 'true' : 'false'}</p>
-        <p>loading: {loading ? 'true' : 'false'}</p>
-        <p>error: {error || 'none'}</p>
-        <p>balances: {balances ? 'exists' : 'null'}</p>
-      </div>
-
-      {!isConnected ? (
+      {!balances ? (
         <div className="bg-gray-800 rounded-lg p-6">
           <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">Connect to Bybit API</h2>
-            <p className="text-gray-400 mb-6">Enter your API credentials to view your portfolio</p>
-          </div>
-          
-          <div className="space-y-4 max-w-md mx-auto">
-            <div>
-              <label className="block text-sm font-medium mb-2">API Key</label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter API Key"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-2">API Secret</label>
-              <input
-                type="password"
-                value={apiSecret}
-                onChange={(e) => setApiSecret(e.target.value)}
-                placeholder="Enter API Secret"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            
+            <h2 className="text-xl font-semibold mb-4">No Portfolio Data</h2>
+            <p className="text-gray-400 mb-6">Click the button below to fetch your portfolio data</p>
             <button
-              onClick={() => {
-                if (apiKey && apiSecret) {
-                  setIsConnected(true)
-                }
-              }}
-              disabled={!apiKey || !apiSecret}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={refreshPortfolio}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Connect Portfolio
+              {loading ? 'Fetching...' : 'Fetch Data'}
             </button>
           </div>
         </div>
@@ -148,126 +108,124 @@ export default function Portfolio() {
             </div>
           )}
 
-          {balances && (
-            <div className="space-y-6">
-              <div className="bg-gray-800 rounded-lg p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-green-400">
-                      {formatUSD(balances.totalUSD)}
-                    </h2>
-                    <p className="text-sm text-gray-400">
-                      Total Portfolio Value
-                      {balances.totalILS && usdToIlsRate && (
-                        <span className="text-blue-300">
-                          ({formatILS(balances.totalILS)})
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  
-                  <div className="text-right">
-                    <button
-                      onClick={refreshPortfolio}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-                    >
-                      🔄 Refresh
-                    </button>
-                    <div className="text-sm text-gray-400 mt-2">Trading + Earn + Funding</div>
-                  </div>
+          <div className="space-y-6">
+            <div className="bg-gray-800 rounded-lg p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-green-400">
+                    {formatUSD(balances.totalUSD)}
+                  </h2>
+                  <p className="text-sm text-gray-400">
+                    Total Portfolio Value
+                    {balances.totalILS && usdToIlsRate && (
+                      <span className="text-blue-300">
+                        ({formatILS(balances.totalILS)})
+                      </span>
+                    )}
+                  </p>
                 </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-400">
-                    <button
-                      onClick={() => {
-                        setApiKey('')
-                        setApiSecret('')
-                        setIsConnected(false)
-                        setBalances(null)
-                      }}
-                      className="text-red-400 hover:text-red-300 underline"
-                    >
-                      Disconnect
-                    </button>
-                  </div>
+                
+                <div className="text-right">
+                  <button
+                    onClick={refreshPortfolio}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                  >
+                    🔄 Refresh
+                  </button>
+                  <div className="text-sm text-gray-400 mt-2">Trading + Earn + Funding</div>
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-4 text-purple-400">
-                  💼 All Assets (Trading + Earn + Funding)
-                </h3>
-                <div className="bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto">
-                  {balances.unified && balances.unified.length > 0 ? (
-                    <div className="space-y-3">
-                      {balances.unified.map((balance: any) => {
-                        const pnl = calculatePnL(balance.coin, balance.usdValue, balance.total)
-                        return (
-                          <div key={`${balance.coin}-combined`} className="bg-gray-700 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-3">
-                                <div className="text-xl text-purple-400">🪙</div>
-                                <div>
-                                  <div className="font-medium text-sm">{balance.coin}</div>
-                                  <div className="text-xs text-gray-400">{balance.coin}</div>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-mono text-sm">
-                                  {formatCrypto(balance.total, balance.coin)}
-                                </div>
-                                <div className="text-sm font-semibold text-green-400">
-                                  {balance.usdValue > 0 ? formatUSD(balance.usdValue) : '$0.00 (Price unavailable)'}
-                                </div>
-                                {balances.totalILS && usdToIlsRate && balance.usdValue > 0 && (
-                                  <div className="text-xs text-blue-300">
-                                    ({formatILS(balance.usdValue * usdToIlsRate)})
-                                  </div>
-                                )}
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-400">
+                  <button
+                    onClick={() => {
+                      setApiKey('')
+                      setApiSecret('')
+                      setIsConnected(false)
+                      setBalances(null)
+                    }}
+                    className="text-red-400 hover:text-red-300 underline"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4 text-purple-400">
+                💼 All Assets (Trading + Earn + Funding)
+              </h3>
+              <div className="bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto">
+                {balances.unified && balances.unified.length > 0 ? (
+                  <div className="space-y-3">
+                    {balances.unified.map((balance: any) => {
+                      const pnl = calculatePnL(balance.coin, balance.usdValue, balance.total)
+                      return (
+                        <div key={`${balance.coin}-combined`} className="bg-gray-700 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="text-xl text-purple-400">🪙</div>
+                              <div>
+                                <div className="font-medium text-sm">{balance.coin}</div>
+                                <div className="text-xs text-gray-400">{balance.coin}</div>
                               </div>
                             </div>
-                            
-                            <div className="border-t border-gray-600 pt-3">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex-1">
-                                  <label className="text-xs text-gray-400 block mb-1">Avg Buy Price (USD)</label>
-                                  <input
-                                    type="number"
-                                    value={buyPrices[balance.coin] || ''}
-                                    onChange={(e) => updateBuyPrice(balance.coin, e.target.value)}
-                                    placeholder="Enter buy price"
-                                    className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                                    step="0.01"
-                                    min="0"
-                                  />
+                            <div className="text-right">
+                              <div className="font-mono text-sm">
+                                {formatCrypto(balance.total, balance.coin)}
+                              </div>
+                              <div className="text-sm font-semibold text-green-400">
+                                {balance.usdValue > 0 ? formatUSD(balance.usdValue) : '$0.00 (Price unavailable)'}
+                              </div>
+                              {balances.totalILS && usdToIlsRate && balance.usdValue > 0 && (
+                                <div className="text-xs text-blue-300">
+                                  ({formatILS(balance.usdValue * usdToIlsRate)})
                                 </div>
-                                <div className="text-right min-w-[100px]">
-                                  <div className="text-xs text-gray-400 mb-1">PnL</div>
-                                  <div className={`text-sm font-semibold ${pnl.profit > 0 ? 'text-green-400' : (pnl.profit < 0 ? 'text-red-400' : 'text-gray-400')}`}>
-                                    {pnl.profit !== 0 ? `${pnl.profit >= 0 ? '+' : ''}${formatUSD(pnl.profit)}` : '-'}
-                                  </div>
-                                  <div className={`text-xs ${pnl.roi > 0 ? 'text-green-300' : (pnl.roi < 0 ? 'text-red-300' : 'text-gray-400')}`}>
-                                    {pnl.roi !== 0 ? `${pnl.roi >= 0 ? '+' : ''}${pnl.roi.toFixed(2)}%` : '-'}
-                                  </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="border-t border-gray-600 pt-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-1">
+                                <label className="text-xs text-gray-400 block mb-1">Avg Buy Price (USD)</label>
+                                <input
+                                  type="number"
+                                  value={buyPrices[balance.coin] || ''}
+                                  onChange={(e) => updateBuyPrice(balance.coin, e.target.value)}
+                                  placeholder="Enter buy price"
+                                  className="w-full px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                                  step="0.01"
+                                  min="0"
+                                />
+                              </div>
+                              <div className="text-right min-w-[100px]">
+                                <div className="text-xs text-gray-400 mb-1">PnL</div>
+                                <div className={`text-sm font-semibold ${pnl.profit > 0 ? 'text-green-400' : (pnl.profit < 0 ? 'text-red-400' : 'text-gray-400')}`}>
+                                  {pnl.profit !== 0 ? `${pnl.profit >= 0 ? '+' : ''}${formatUSD(pnl.profit)}` : '-'}
+                                </div>
+                                <div className={`text-xs ${pnl.roi > 0 ? 'text-green-300' : (pnl.roi < 0 ? 'text-red-300' : 'text-gray-400')}`}>
+                                  {pnl.roi !== 0 ? `${pnl.roi >= 0 ? '+' : ''}${pnl.roi.toFixed(2)}%` : '-'}
                                 </div>
                               </div>
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-500 py-8">
-                      <div className="text-6xl mb-4">📊</div>
-                      <p className="text-lg">No assets found in your connected wallet</p>
-                      <p className="text-sm text-gray-400 mt-2">Make sure you have funds in your Bybit account or check your API permissions</p>
-                    </div>
-                  )}
-                </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500 py-8">
+                    <div className="text-6xl mb-4">📊</div>
+                    <p className="text-lg">No assets found in your connected wallet</p>
+                    <p className="text-sm text-gray-400 mt-2">Make sure you have funds in your Bybit account or check your API permissions</p>
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </>
       )}
     </div>
