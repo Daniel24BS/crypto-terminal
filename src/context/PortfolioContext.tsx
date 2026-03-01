@@ -104,20 +104,13 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     
     if (savedApiKey && savedApiSecret) {
       console.log("Auto-fetch triggered with saved keys")
+      alert("I am trying to fetch data now!")
       // Set connected state immediately
       setIsConnected(true)
       // Trigger portfolio fetch
       refreshPortfolio()
     }
   }, []) // Empty dependency array ensures this runs only on mount
-
-  // Also trigger fetch when keys change (for manual entry)
-  useEffect(() => {
-    if (apiKey && apiSecret && !balances && !loading) {
-      console.log("Fetch triggered by key change")
-      refreshPortfolio()
-    }
-  }, [apiKey, apiSecret])
 
   const refreshPortfolio = async () => {
     if (!apiKey || !apiSecret) {
@@ -129,7 +122,9 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     setError('')
 
     try {
-      // Use our own Vercel serverless function
+      // ONLY use our internal API - no external proxies
+      console.log("Calling internal API: /api/fetch-portfolio")
+      
       const response = await fetch('/api/fetch-portfolio', {
         method: 'POST',
         headers: {
