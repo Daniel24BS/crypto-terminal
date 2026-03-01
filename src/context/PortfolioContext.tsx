@@ -96,7 +96,25 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
 
   // Auto-fetch portfolio when API keys are available
   useEffect(() => {
-    if (apiKey && apiSecret && !balances) {
+    // Check localStorage immediately on mount
+    const savedApiKey = localStorage.getItem('bybit_api_key')
+    const savedApiSecret = localStorage.getItem('bybit_api_secret')
+    
+    console.log("Mount check - saved keys:", { savedApiKey: !!savedApiKey, savedApiSecret: !!savedApiSecret })
+    
+    if (savedApiKey && savedApiSecret) {
+      console.log("Auto-fetch triggered with saved keys")
+      // Set connected state immediately
+      setIsConnected(true)
+      // Trigger portfolio fetch
+      refreshPortfolio()
+    }
+  }, []) // Empty dependency array ensures this runs only on mount
+
+  // Also trigger fetch when keys change (for manual entry)
+  useEffect(() => {
+    if (apiKey && apiSecret && !balances && !loading) {
+      console.log("Fetch triggered by key change")
       refreshPortfolio()
     }
   }, [apiKey, apiSecret])
