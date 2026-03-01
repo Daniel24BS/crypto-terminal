@@ -35,7 +35,6 @@ export default function SmartConverter() {
   const [baseExchangeRate, setBaseExchangeRate] = useState(3.65)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ConversionResult | null>(null)
-  const [coinRates, setCoinRates] = useState<{ [key: string]: { ils: number; usd: number } }>({})
 
   const MINIMUM_FEE_ILS = 15
   const bybitFiatFee = 0.02
@@ -102,14 +101,6 @@ export default function SmartConverter() {
       // Fetch current coin rates
       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${selectedCoin}&vs_currencies=ils,usd`)
       const data = await res.json()
-      const rates = {
-        [selectedCoin]: {
-          ils: data[selectedCoin].ils,
-          usd: data[selectedCoin].usd
-        }
-      }
-      setCoinRates(rates)
-
       const rateILS = data[selectedCoin].ils
       const rateUSD = data[selectedCoin].usd
       const coin = coins.find(c => c.id === selectedCoin)!

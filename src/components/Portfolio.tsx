@@ -1,20 +1,5 @@
 import { useState, useEffect } from 'react'
-import { usePortfolio } from './PortfolioContext'
-
-interface AccountBalance {
-  unified: {
-    coin: string
-    coinId: string
-    coinName: string
-    total: string
-    available: string
-    usdValue: number
-  }[]
-  fund: any[]
-  totalUSD: number
-  totalILS?: number
-  usdToIlsRate?: number
-}
+import { usePortfolio } from './context/PortfolioContext'
 
 export default function Portfolio() {
   const { balances, loading, error, isConnected, apiKey, apiSecret, usdToIlsRate, setBalances, setLoading, setError, setIsConnected, setApiKey, setApiSecret, refreshPortfolio } = usePortfolio()
@@ -87,80 +72,8 @@ export default function Portfolio() {
     return `${num.toFixed(6)} ${symbol}`
   }
 
-  const getCoinName = (symbol: string): string => {
-    const coinNames: Record<string, string> = {
-      BTC: 'Bitcoin',
-      ETH: 'Ethereum',
-      USDT: 'Tether',
-      USDC: 'USD Coin',
-      BNB: 'Binance Coin',
-      SOL: 'Solana',
-      ADA: 'Cardano',
-      XRP: 'Ripple',
-      DOGE: 'Dogecoin',
-      MATIC: 'Polygon',
-      DOT: 'Polkadot',
-      AVAX: 'Avalanche',
-      LINK: 'Chainlink',
-      UNI: 'Uniswap',
-      ATOM: 'Cosmos',
-      'LUNA': 'Luna 2.0',
-      ICP: 'Internet Computer',
-      VET: 'VeChain',
-      THETA: 'Theta Network',
-      FTM: 'Fantom',
-      APE: 'ApeCoin',
-      SHIB: 'Shiba Inu',
-      CRO: 'Cronos',
-      MANA: 'Decentraland',
-      SAND: 'The Sandbox',
-      AXS: 'Axie Infinity',
-      ENJ: 'Enjin Coin',
-      CHZ: 'Chiliz',
-      PUMP: 'PUMP',
-      LAVA: 'LAVA'
-    }
-    
-    return coinNames[symbol] || symbol
-  }
-
-  const getCoinIcon = (symbol: string): string => {
-    const coinIcons: Record<string, string> = {
-      BTC: '₿',
-      ETH: 'Ξ',
-      USDT: '₮',
-      USDC: '$',
-      BNB: '🟡',
-      SOL: '◎',
-      ADA: '₳',
-      XRP: 'X',
-      DOGE: '🐕',
-      MATIC: '🟦',
-      DOT: '●',
-      AVAX: '🔺',
-      LINK: '🔗',
-      UNI: '🦄',
-      ATOM: '⚛',
-      'LUNA': '🌙',
-      ICP: '🧠',
-      VET: 'V',
-      THETA: 'Θ',
-      FTM: 'F',
-      APE: '🐵',
-      SHIB: '🐕',
-      CRO: '🟪',
-      MANA: '🏖',
-      SAND: '🏖',
-      AXS: '🎮',
-      ENJ: '🟩',
-      CHZ: '🎴',
-      PUMP: '🚀',
-      LAVA: '🌋'
-    }
-    
-    return coinIcons[symbol] || '🪙'
-  }
-
+  
+  
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -281,15 +194,15 @@ export default function Portfolio() {
                 <div className="bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto">
                   {balances.unified.length > 0 ? (
                     <div className="space-y-3">
-                      {balances.unified.map((balance) => {
+                      {balances.unified.map((balance: any) => {
                         const pnl = calculatePnL(balance.coin, balance.usdValue, balance.total)
                         return (
                           <div key={`${balance.coin}-combined`} className="bg-gray-700 rounded-lg p-3">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center space-x-3">
-                                <div className="text-xl text-purple-400">{getCoinIcon(balance.coin)}</div>
+                                <div className="text-xl text-purple-400">🪙</div>
                                 <div>
-                                  <div className="font-medium text-sm">{balance.coinName}</div>
+                                  <div className="font-medium text-sm">{balance.coin}</div>
                                   <div className="text-xs text-gray-400">{balance.coin}</div>
                                 </div>
                               </div>
