@@ -77,8 +77,6 @@ export default function DCASimulator() {
     }).format(value)
   }
 
-  const selectedCrypto = cryptocurrencies.find(c => c.symbol === selectedCoin)
-
   return (
     <div className="bg-gray-900 rounded-xl p-6 shadow-xl">
       <h2 className="text-2xl font-bold mb-6 text-green-400">DCA Investment Simulator</h2>

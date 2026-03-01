@@ -37,6 +37,7 @@ interface PortfolioContextType {
   setIsConnected: (isConnected: boolean) => void
   setApiKey: (apiKey: string) => void
   setApiSecret: (apiSecret: string) => void
+  setUsdToIlsRate: (rate: number) => void
   refreshPortfolio: () => Promise<void>
 }
 
@@ -57,7 +58,7 @@ function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [apiKey, setApiKey] = useState('')
   const [apiSecret, setApiSecret] = useState('')
   const [isConnected, setIsConnected] = useState(false)
-  const [usdToIlsRate, setUsdToIlsRateState] = useState(3.7)
+  const [usdToIlsRate, setUsdToIlsRate] = useState(3.7)
 
   const refreshPortfolio = async () => {
     // This will be implemented in Portfolio component
@@ -72,6 +73,7 @@ function PortfolioProvider({ children }: { children: React.ReactNode }) {
     apiKey,
     apiSecret,
     usdToIlsRate,
+    setUsdToIlsRate,
     setBalances,
     setLoading,
     setError,
