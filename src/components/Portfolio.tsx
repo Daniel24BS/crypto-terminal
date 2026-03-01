@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { usePortfolio } from './context/PortfolioContext'
+import { usePortfolio } from '../context/PortfolioContext'
 
 export default function Portfolio() {
-  const { balances, loading, error, isConnected, apiKey, apiSecret, usdToIlsRate, setBalances, setLoading, setError, setIsConnected, setApiKey, setApiSecret, refreshPortfolio } = usePortfolio()
+  const { balances, loading, error, isConnected, apiKey, apiSecret, usdToIlsRate, setBalances, setIsConnected, setApiKey, setApiSecret, refreshPortfolio } = usePortfolio()
 
   const [buyPrices, setBuyPrices] = useState<Record<string, string>>({})
 
