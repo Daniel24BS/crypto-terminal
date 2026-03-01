@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 
 interface AccountBalance {
   unified: {
@@ -94,6 +94,13 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     }
   }
 
+  // Auto-fetch portfolio when API keys are available
+  useEffect(() => {
+    if (apiKey && apiSecret && !balances) {
+      refreshPortfolio()
+    }
+  }, [apiKey, apiSecret])
+
   const refreshPortfolio = async () => {
     if (!apiKey || !apiSecret) {
       setError('API keys not provided')
@@ -104,53 +111,25 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     setError('')
 
     try {
-      // Try multiple proxy strategies for maximum reliability
-      const apiUrl = 'https://api.bybit.com/v5/account/wallet-balance'
-      const proxies = [
-        `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(apiUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
-        apiUrl // Direct fetch as last resort
-      ]
+      // Use our own Vercel serverless function
+      const response = await fetch('/api/fetch-portfolio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          apiKey,
+          apiSecret
+        })
+      })
 
-      let data = null
-      let lastError = null
-
-      for (const proxyUrl of proxies) {
-        try {
-          console.log("Trying proxy:", proxyUrl)
-          
-          const headers: Record<string, string> = {
-            'X-BAPI-API-KEY': apiKey,
-            'X-BAPI-SIGN': apiSecret,
-            'X-BAPI-SIGN-TYPE': '2',
-            'X-BAPI-TIMESTAMP': Date.now().toString(),
-            'X-BAPI-RECV-WINDOW': '5000'
-          }
-          
-          // Only add Content-Type for non-proxy requests
-          if (proxyUrl === apiUrl) {
-            headers['Content-Type'] = 'application/json'
-          }
-
-          const response = await fetch(proxyUrl, { headers })
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
-          }
-
-          data = await response.json()
-          console.log("SUCCESS with proxy:", proxyUrl, data)
-          break // Success, exit the loop
-        } catch (error) {
-          console.error(`Failed with proxy ${proxyUrl}:`, error)
-          lastError = error
-          continue // Try next proxy
-        }
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
       }
 
-      if (!data) {
-        throw lastError || new Error('All proxies failed')
-      }
+      const data = await response.json()
+      console.log("Portfolio data from serverless function:", data)
 
       if (data?.result?.list) {
         const accountData = data.result.list[0]
@@ -176,6 +155,7 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
           totalILS: totalUSD * usdToIlsRate,
           usdToIlsRate
         })
+        setIsConnected(true)
       } else {
         setError('No portfolio data found')
       }
