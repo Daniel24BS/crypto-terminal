@@ -140,9 +140,20 @@ export default function Portfolio() {
                     setIsConnected(false)
                     setBalances(null)
                   }}
-                  className="text-red-400 hover:text-red-300 underline"
+                  className="text-red-400 hover:text-red-300 underline mr-4"
                 >
                   Disconnect
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.clear()
+                    sessionStorage.clear()
+                    caches.keys().then(names => names.forEach(name => caches.delete(name)))
+                    window.location.reload()
+                  }}
+                  className="text-orange-400 hover:text-orange-300 underline"
+                >
+                  NUKE APP CACHE
                 </button>
               </div>
             </div>

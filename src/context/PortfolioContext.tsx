@@ -124,13 +124,17 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     setError('')
 
     try {
+      // Force cache busting - ensure we're using latest version
+      const timestamp = Date.now()
+      
       // Call our internal API - keys are now server-side
-      console.log("Calling internal API: /api/fetch-portfolio")
+      console.log("Calling internal API: /api/fetch-portfolio", { timestamp })
       
       const response = await fetch('/api/fetch-portfolio', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         }
       })
 
@@ -176,6 +180,12 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     } catch (error) {
       console.error('Portfolio fetch error:', error)
       setError('Failed to fetch portfolio data')
+      
+      // Force reload if we detect old cached behavior
+      if ((error as any).message?.includes('corsproxy') || (error as any).message?.includes('403')) {
+        console.log('Detected old cached behavior - forcing reload')
+        window.location.reload()
+      }
     } finally {
       setLoading(false)
     }
