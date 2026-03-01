@@ -117,49 +117,28 @@ export default function SmartConverter() {
     setResult(null)
 
     try {
-      // Fetch current coin rates with multiple proxy strategies
-      const apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${selectedCoin}&vs_currencies=ils,usd`
-      const proxies = [
-        `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(apiUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
-        apiUrl // Direct fetch as last resort
-      ]
-
-      let data = null
-      let lastError = null
-
-      for (const proxyUrl of proxies) {
-        try {
-          console.log("Trying coin proxy:", proxyUrl)
-          
-          const res = await fetch(proxyUrl)
-          
-          if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`)
-          }
-          
-          const responseData = await res.json()
-          
-          if (responseData?.[selectedCoin]) {
-            data = responseData
-            console.log("SUCCESS with coin proxy:", proxyUrl, data)
-            break // Success, exit the loop
-          } else {
-            throw new Error('Invalid data structure')
-          }
-        } catch (e) {
-          console.error(`Failed with coin proxy ${proxyUrl}:`, e)
-          lastError = e
-          continue // Try next proxy
+      // Fetch current coin rates from our server API
+      console.log("Fetching coin rates from server...")
+      const response = await fetch('/api/fetch-portfolio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         }
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log("SUCCESS: Coin data from server:", data)
+
+      if (!data?.balances?.result?.list) {
+        throw new Error('No portfolio data found')
       }
 
-      if (!data) {
-        throw lastError || new Error('All proxies failed')
-      }
-
-      const rateILS = data[selectedCoin].ils
-      const rateUSD = data[selectedCoin].usd
+      const rateILS = data.balances.result.list[0].coin.find((c: any) => c.coin === selectedCoin)?.usdPrice || 0
+      const rateUSD = data.balances.result.list[0].coin.find((c: any) => c.coin === selectedCoin)?.usdPrice || 0
         const coin = coins.find(c => c.id === selectedCoin)!
         const symbol = coin.symbol
 
