@@ -127,10 +127,10 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       // Force cache busting - ensure we're using latest version
       const timestamp = Date.now()
       
-      // Call our internal API - keys are now server-side
-      console.log("Calling internal API: /api/fetch-portfolio", { timestamp })
+      // Call our Cloudflare Worker API - keys are now server-side
+      console.log("Calling Cloudflare Worker API:", { timestamp })
       
-      const response = await fetch('/api/fetch-portfolio', {
+      const response = await fetch('https://crypto-terminal-api.your-subdomain.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       }
 
       const data = await response.json()
-      console.log("Portfolio data from serverless function:", data)
+      console.log("Portfolio data from Cloudflare Worker:", data)
 
       if (data?.balances?.result?.list) {
         const accountData = data.balances.result.list[0]

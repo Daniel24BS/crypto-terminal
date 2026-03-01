@@ -45,9 +45,9 @@ export default function SmartConverter() {
 
   const initRate = async () => {
     try {
-      // Get ILS rate from our server API
-      console.log("Fetching ILS rate from server...")
-      const response = await fetch('/api/fetch-portfolio', {
+      // Get ILS rate from our Cloudflare Worker API
+      console.log("Fetching ILS rate from Cloudflare Worker...")
+      const response = await fetch('https://crypto-terminal-api.your-subdomain.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -58,14 +58,14 @@ export default function SmartConverter() {
         const data = await response.json()
         if (data?.ilsRate) {
           setBaseExchangeRate(data.ilsRate)
-          console.log("SUCCESS: ILS rate from server:", data.ilsRate)
+          console.log("SUCCESS: ILS rate from Cloudflare Worker:", data.ilsRate)
           return
         }
       }
       
       throw new Error('No ILS rate in server response')
     } catch (e) {
-      console.error('Failed to fetch ILS rate from server:', e)
+      console.error('Failed to fetch ILS rate from Cloudflare Worker:', e)
       // FALLBACK: Set a reasonable default rate so app doesn't crash
       console.log('Using fallback ILS rate: 3.65')
       setBaseExchangeRate(3.65)
@@ -117,9 +117,9 @@ export default function SmartConverter() {
     setResult(null)
 
     try {
-      // Fetch current coin rates from our server API
-      console.log("Fetching coin rates from server...")
-      const response = await fetch('/api/fetch-portfolio', {
+      // Fetch current coin rates from our Cloudflare Worker API
+      console.log("Fetching coin rates from Cloudflare Worker...")
+      const response = await fetch('https://crypto-terminal-api.your-subdomain.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -131,7 +131,7 @@ export default function SmartConverter() {
       }
       
       const data = await response.json()
-      console.log("SUCCESS: Coin data from server:", data)
+      console.log("SUCCESS: Coin data from Cloudflare Worker:", data)
 
       if (!data?.balances?.result?.list) {
         throw new Error('No portfolio data found')
