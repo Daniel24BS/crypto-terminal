@@ -1,0 +1,22 @@
+{
+  "name": "Crypto Trading Terminal",
+  "short_name": "Crypto Terminal",
+  "description": "Advanced cryptocurrency trading terminal with portfolio management, DCA simulator, and smart converter",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1E293B",
+  "theme_color": "#1E293B",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -142,8 +142,8 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       const data = await response.json()
       console.log("Portfolio data from serverless function:", data)
 
-      if (data?.result?.list) {
-        const accountData = data.result.list[0]
+      if (data?.balances?.result?.list) {
+        const accountData = data.balances.result.list[0]
         const unifiedBalances = accountData.coin.filter((coin: any) => 
           parseFloat(coin.walletBalance) > 0 || parseFloat(coin.unrealisedPnl) !== 0
         ).map((coin: any) => ({
