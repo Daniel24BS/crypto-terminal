@@ -134,7 +134,11 @@ function App() {
           <main className="max-w-6xl mx-auto">
             {activeTab === 'converter' && <SmartConverter />}
             {activeTab === 'memecoin' && <MemecoinRadar />}
-            {activeTab === 'portfolio' && <Portfolio />}
+            {activeTab === 'portfolio' && (
+              <PortfolioProvider>
+                <Portfolio />
+              </PortfolioProvider>
+            )}
             {activeTab === 'simulator' && <Simulator />}
             {activeTab === 'sentiment' && <MarketSentiment />}
           </main>
