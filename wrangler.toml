@@ -1,0 +1,14 @@
+name = "crypto-terminal"
+compatibility_date = "2024-01-01"
+
+[env.production]
+vars = [
+  { binding = "BYBIT_API_KEY", type = "secret" },
+  { binding = "BYBIT_API_SECRET", type = "secret" }
+]
+
+[env.preview]
+vars = [
+  { binding = "BYBIT_API_KEY", type = "secret" },
+  { binding = "BYBIT_API_SECRET", type = "secret" }
+]
