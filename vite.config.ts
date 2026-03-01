@@ -10,15 +10,15 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'My Crypto Terminal',
-        short_name: 'CryptoTerm',
+        name: 'Crypto Terminal',
+        short_name: 'CryptoApp',
         description: 'Professional cryptocurrency trading terminal with portfolio tracking, PnL analysis, and market sentiment',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#1E293B',
+        background_color: '#1E293B',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'portrait-primary',
         scope: '/',
-        start_url: '/',
+        start_url: '/?v=2.0',
         icons: [
           {
             src: 'pwa-192x192.png',
