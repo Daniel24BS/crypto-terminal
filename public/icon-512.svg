@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#0f172a"/>
+  <text x="256" y="200" font-family="Arial, sans-serif" font-size="120" font-weight="bold" text-anchor="middle" fill="#3b82f6">₿</text>
+  <text x="256" y="320" font-family="Arial, sans-serif" font-size="80" font-weight="bold" text-anchor="middle" fill="#10b981">TERM</text>
+  <circle cx="256" cy="256" r="240" fill="none" stroke="#3b82f6" stroke-width="8"/>
+</svg>
