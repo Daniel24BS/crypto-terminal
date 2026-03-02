@@ -30,12 +30,12 @@ export default {
 
       if (!apiKey || !apiSecret) {
         return new Response(JSON.stringify({ error: 'API keys not provided' }), {
-          status: 500,
+          status: 400,
           headers: corsHeaders
         });
       }
 
-      // Fetch ILS rate from public source
+      // Fetch ILS rate from public source (independent of Bybit keys)
       let ilsRate = 3.65; // fallback
       try {
         console.log("Fetching ILS rate from server...");
@@ -49,36 +49,53 @@ export default {
         }
       } catch (error) {
         console.error("Failed to fetch ILS rate:", error);
-        // Keep fallback rate
+        // Keep fallback rate - don't crash
       }
 
       // Fetch portfolio data from Bybit API
-      const apiUrl = 'https://api.bybit.com/v5/account/wallet-balance';
-      const timestamp = Date.now().toString();
-      const recvWindow = '5000';
+      let bybitData = null;
+      try {
+        const apiUrl = 'https://api.bybit.com/v5/account/wallet-balance';
+        const timestamp = Date.now().toString();
+        const recvWindow = '5000';
 
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'X-BAPI-API-KEY': apiKey,
-          'X-BAPI-SIGN': apiSecret,
-          'X-BAPI-SIGN-TYPE': '2',
-          'X-BAPI-TIMESTAMP': timestamp,
-          'X-BAPI-RECV-WINDOW': recvWindow,
-          'Content-Type': 'application/json'
+        const bybitResponse = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'X-BAPI-API-KEY': apiKey,
+            'X-BAPI-SIGN': apiSecret,
+            'X-BAPI-SIGN-TYPE': '2',
+            'X-BAPI-TIMESTAMP': timestamp,
+            'X-BAPI-RECV-WINDOW': recvWindow,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!bybitResponse.ok) {
+          throw new Error(`Bybit API error! status: ${bybitResponse.status}`);
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        bybitData = await bybitResponse.json();
+        console.log("Bybit API response:", bybitData);
+
+        if (!bybitData?.result?.list || bybitData.result.list.length === 0) {
+          throw new Error('No portfolio data found in Bybit response');
+        }
+
+      } catch (bybitError) {
+        console.error("Bybit API fetch error:", bybitError);
+        return new Response(JSON.stringify({ 
+          error: bybitError.message || 'Failed to fetch portfolio data from Bybit',
+          details: bybitError.toString()
+        }), {
+          status: 500,
+          headers: corsHeaders
+        });
       }
-
-      const data = await response.json();
-      console.log("Bybit API response:", data);
 
       // Return both portfolio data and ILS rate in structured response
       return new Response(JSON.stringify({
-        balances: data,
+        balances: bybitData,
         ilsRate
       }), {
         status: 200,
@@ -89,10 +106,10 @@ export default {
       });
 
     } catch (error) {
-      console.error('Portfolio fetch error:', error);
+      console.error('Worker error:', error);
       return new Response(JSON.stringify({ 
-        error: 'Failed to fetch portfolio data',
-        details: error.message || 'Unknown error'
+        error: error.message || 'Internal server error',
+        details: error.toString()
       }), {
         status: 500,
         headers: corsHeaders
