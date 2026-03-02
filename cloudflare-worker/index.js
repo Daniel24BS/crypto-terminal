@@ -100,7 +100,7 @@ export default {
 
           // Helper function to make authenticated Bybit requests
           const makeBybitRequest = async (url, queryString) => {
-            const sign = generateBybitSignature(queryString, timestamp, recvWindow, apiSecret);
+            const sign = generateBybitSignature(queryString, timestamp, recvWindow, apiKey, apiSecret);
             const fullUrl = `https://api.bybit.com${url}?${queryString}`;
             
             console.log(`Fetching from: ${fullUrl}`);
@@ -220,7 +220,7 @@ export default {
 };
 
 // Helper function to generate Bybit signature using Node.js crypto
-function generateBybitSignature(queryString, timestamp, recvWindow, apiSecret) {
-  const message = timestamp + recvWindow + queryString;
+function generateBybitSignature(queryString, timestamp, recvWindow, apiKey, apiSecret) {
+  const message = timestamp + apiKey + recvWindow + queryString;
   return crypto.createHmac('sha256', apiSecret).update(message).digest('hex');
 }
