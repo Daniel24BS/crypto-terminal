@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { usePortfolio } from '../context/PortfolioContext'
 
 export default function ApiKeyModal() {
-  const { apiKey, apiSecret, setApiKey, setApiSecret, refreshPortfolio } = usePortfolio()
-  const [isOpen, setIsOpen] = useState(false)
+  const { setApiKey, setApiSecret, fetchPortfolio } = usePortfolio()
   const [tempApiKey, setTempApiKey] = useState('')
   const [tempApiSecret, setTempApiSecret] = useState('')
 
@@ -13,13 +12,12 @@ export default function ApiKeyModal() {
     if (tempApiKey.trim() && tempApiSecret.trim()) {
       setApiKey(tempApiKey.trim())
       setApiSecret(tempApiSecret.trim())
-      setIsOpen(false)
       setTempApiKey('')
       setTempApiSecret('')
       
       // Trigger portfolio fetch after setting keys
       setTimeout(() => {
-        refreshPortfolio()
+        fetchPortfolio()
       }, 100)
     } else {
       alert('Please enter both API Key and API Secret')
@@ -27,12 +25,9 @@ export default function ApiKeyModal() {
   }
 
   const handleCancel = () => {
-    setIsOpen(false)
     setTempApiKey('')
     setTempApiSecret('')
   }
-
-  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

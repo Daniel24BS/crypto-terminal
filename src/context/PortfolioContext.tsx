@@ -1,15 +1,16 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
+
+interface Coin {
+  coin: string
+  total: string
+  available: string
+  usdValue: number
+}
 
 interface AccountBalance {
-  unified: {
-    coin: string
-    coinId: string
-    coinName: string
-    total: string
-    available: string
-    usdValue: number
-  }[]
-  fund: any[]
+  unified: Coin[]
+  fund: Coin[]
   totalUSD: number
   totalILS?: number
   usdToIlsRate?: number
@@ -17,65 +18,42 @@ interface AccountBalance {
 
 interface PortfolioContextType {
   balances: AccountBalance | null
-  loading: boolean
-  error: string
-  isConnected: boolean
+  isLoading: boolean
+  error: string | null
   apiKey: string
   apiSecret: string
-  usdToIlsRate: number
   setBalances: (balances: AccountBalance | null) => void
-  setLoading: (loading: boolean) => void
-  setError: (error: string) => void
-  setIsConnected: (isConnected: boolean) => void
-  setApiKey: (apiKey: string) => void
-  setApiSecret: (apiSecret: string) => void
-  setUsdToIlsRate: (rate: number) => void
-  refreshPortfolio: () => void
+  setIsLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
+  setApiKey: (key: string) => void
+  setApiSecret: (secret: string) => void
+  fetchPortfolio: () => void
 }
 
 export const PortfolioContext = createContext<PortfolioContextType | null>(null)
 
 export const usePortfolio = () => {
   const context = useContext(PortfolioContext)
-  // FAILSAFE: Return fallback instead of throwing error to prevent black screen
   if (!context) {
-    return {
-      balances: null,
-      loading: false,
-      error: '',
-      isConnected: false,
-      apiKey: '',
-      apiSecret: '',
-      usdToIlsRate: 3.7,
-      setBalances: () => {},
-      setLoading: () => {},
-      setError: () => {},
-      setIsConnected: () => {},
-      setApiKey: () => {},
-      setApiSecret: () => {},
-      setUsdToIlsRate: () => {},
-      refreshPortfolio: () => {}
-    }
+    throw new Error('usePortfolio must be used within PortfolioProvider')
   }
   return context
 }
 
-export const PortfolioProvider = ({ children }: { children: React.ReactNode }) => {
-  const [balances, setBalances] = useState<AccountBalance | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [isConnected, setIsConnected] = useState(false)
-  
-  // Initialize API keys from localStorage on mount
+export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
+  // INITIAL STATE: Read from localStorage
   const [apiKey, setApiKey] = useState(() => {
     return localStorage.getItem('bybit_api_key') || ''
   })
   const [apiSecret, setApiSecret] = useState(() => {
     return localStorage.getItem('bybit_api_secret') || ''
   })
-  const [usdToIlsRate, setUsdToIlsRate] = useState(3.7)
+  
+  const [balances, setBalances] = useState<AccountBalance | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Save API keys to localStorage whenever they change
+  // Save to localStorage whenever keys change
   const handleSetApiKey = (key: string) => {
     setApiKey(key)
     if (key) {
@@ -94,46 +72,18 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     }
   }
 
-  // Auto-fetch portfolio when API keys are available
-  useEffect(() => {
-    // Check localStorage immediately on mount
-    const savedApiKey = localStorage.getItem('bybit_api_key')
-    const savedApiSecret = localStorage.getItem('bybit_api_secret')
-    
-    console.log("Mount check - saved keys:", { savedApiKey: !!savedApiKey, savedApiSecret: !!savedApiSecret })
-    
-    if (savedApiKey && savedApiSecret) {
-      console.log("Auto-fetch triggered with saved keys")
-      // Set connected state immediately
-      setIsConnected(true)
-      // Trigger portfolio fetch
-      refreshPortfolio()
-    }
-  }, []) // Empty dependency array ensures this runs only on mount
+  // FETCH LOGIC: Only runs if keys exist
+  const fetchPortfolio = async () => {
+    if (!apiKey || !apiSecret) return
 
-  // Auto-set connected state when fetch is successful
-  useEffect(() => {
-    if (balances && !loading) {
-      setIsConnected(true)
-    }
-  }, [balances, loading])
-
-  const refreshPortfolio = async () => {
-    setLoading(true)
-    setError('')
+    setIsLoading(true)
+    setError(null)
 
     try {
-      // Force cache busting - ensure we're using latest version
-      const timestamp = Date.now()
-      
-      // Call our Cloudflare Worker API - pass API keys in headers
-      console.log("Calling Cloudflare Worker API:", { timestamp })
-      
       const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
           'BYBIT_API_KEY': apiKey,
           'BYBIT_API_SECRET': apiSecret
         }
@@ -145,89 +95,60 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       }
 
       const data = await response.json()
-      console.log("Portfolio data from Cloudflare Worker:", data)
-
-      // Debug the data structure
-      console.log("Data structure check:", {
-        hasBalances: !!data?.balances,
-        hasResult: !!data?.balances?.result,
-        hasList: !!data?.balances?.result?.list,
-        listLength: data?.balances?.result?.list?.length,
-        firstAccount: data?.balances?.result?.list?.[0],
-        hasCoin: !!data?.balances?.result?.list?.[0]?.coin
-      })
 
       if (data?.balances?.result?.list && data.balances.result.list.length > 0) {
         const accountData = data.balances.result.list[0]
-        console.log("Account data:", accountData)
-        console.log("Coin array:", accountData.coin)
-        
         const unifiedBalances = accountData.coin.filter((coin: any) => 
           parseFloat(coin.walletBalance) > 0 || parseFloat(coin.unrealisedPnl) !== 0
         ).map((coin: any) => ({
           coin: coin.coin,
-          coinId: coin.coin.toLowerCase(),
-          coinName: coin.coin,
           total: coin.walletBalance,
           available: coin.free,
           usdValue: parseFloat(coin.walletBalance) * (coin.usdPrice || 0)
         }))
 
-        console.log("Processed unified balances:", unifiedBalances)
-
         const totalUSD = unifiedBalances.reduce((sum: number, balance: any) => 
           sum + balance.usdValue, 0
         )
 
-        // Use ILS rate from server response
         const serverIlsRate = data.ilsRate || 3.65
 
-        const newBalances = {
+        setBalances({
           unified: unifiedBalances,
           fund: [],
           totalUSD,
           totalILS: totalUSD * serverIlsRate,
           usdToIlsRate: serverIlsRate
-        }
-
-        console.log("Setting new balances state:", newBalances)
-        setBalances(newBalances)
-        setIsConnected(true)
-        console.log("State updated successfully")
+        })
       } else {
-        console.log("No portfolio data found in expected structure")
         setError('No portfolio data found')
       }
-    } catch (error) {
-      console.error('Portfolio fetch error:', error)
-      setError('Failed to fetch portfolio data')
-      
-      // Force reload if we detect old cached behavior
-      if ((error as any).message?.includes('corsproxy') || (error as any).message?.includes('403')) {
-        console.log('Detected old cached behavior - forcing reload')
-        window.location.reload()
-      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch portfolio data')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
+  // Auto-fetch on mount if keys exist
+  useEffect(() => {
+    if (apiKey && apiSecret) {
+      fetchPortfolio()
+    }
+  }, [])
+
   const value: PortfolioContextType = {
     balances,
-    loading,
+    isLoading,
     error,
-    isConnected,
     apiKey,
     apiSecret,
-    usdToIlsRate,
     setBalances,
-    setLoading,
+    setIsLoading,
     setError,
-    setIsConnected,
     setApiKey: handleSetApiKey,
     setApiSecret: handleSetApiSecret,
-    setUsdToIlsRate,
-    refreshPortfolio
+    fetchPortfolio
   }
 
   return (
