@@ -1,5 +1,5 @@
+import { useState } from 'react'
 import { usePortfolio } from '../context/PortfolioContext'
-import ApiKeyModal from './ApiKeyModal'
 
 export default function Portfolio() {
   const { 
@@ -8,12 +8,80 @@ export default function Portfolio() {
     error, 
     apiKey, 
     apiSecret, 
+    setApiKey, 
+    setApiSecret, 
     fetchPortfolio 
   } = usePortfolio()
 
+  const [tempApiKey, setTempApiKey] = useState('')
+  const [tempApiSecret, setTempApiSecret] = useState('')
+
   // RENDER LOGIC: Strict conditional rendering
   if (!apiKey || !apiSecret) {
-    return <ApiKeyModal />
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-2">💼 Portfolio</h1>
+          <p className="text-gray-400">Track your cryptocurrency investments</p>
+        </div>
+        
+        <div className="bg-gray-800 rounded-lg p-6 max-w-md mx-auto">
+          <h2 className="text-xl font-semibold mb-4 text-white">Connect Bybit Account</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Bybit API Key
+              </label>
+              <input
+                type="password"
+                value={tempApiKey}
+                onChange={(e) => setTempApiKey(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your Bybit API Key"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Bybit API Secret
+              </label>
+              <input
+                type="password"
+                value={tempApiSecret}
+                onChange={(e) => setTempApiSecret(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your Bybit API Secret"
+              />
+            </div>
+            
+            <button
+              onClick={() => {
+                if (tempApiKey.trim() && tempApiSecret.trim()) {
+                  setApiKey(tempApiKey.trim())
+                  setApiSecret(tempApiSecret.trim())
+                  setTempApiKey('')
+                  setTempApiSecret('')
+                  setTimeout(() => {
+                    fetchPortfolio()
+                  }, 100)
+                } else {
+                  alert('Please enter both API Key and API Secret')
+                }
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+            >
+              Connect Portfolio
+            </button>
+          </div>
+          
+          <div className="mt-4 text-xs text-gray-400">
+            <p className="mb-2">Your API keys are stored locally in your browser.</p>
+            <p>All API calls go through Cloudflare Worker to bypass CORS restrictions.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -51,6 +119,15 @@ export default function Portfolio() {
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-2">💼 Portfolio</h1>
         <p className="text-gray-400">Track your cryptocurrency investments</p>
+        <button
+          onClick={() => {
+            setApiKey('')
+            setApiSecret('')
+          }}
+          className="mt-4 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+        >
+          Disconnect
+        </button>
       </div>
 
       {balances && (
