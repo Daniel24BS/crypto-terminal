@@ -81,159 +81,35 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('Fetching prices for coins:', coins);
 
-      // Symbol mapping for common coins (symbol -> Binance symbol)
-      const symbolMap: Record<string, string> = {
-        'BTC': 'BTCUSDT',
-        'ETH': 'ETHUSDT',
-        'XRP': 'XRPUSDT',
-        'SOL': 'SOLUSDT',
-        'ADA': 'ADAUSDT',
-        'DOT': 'DOTUSDT',
-        'MATIC': 'MATICUSDT',
-        'AVAX': 'AVAXUSDT',
-        'LINK': 'LINKUSDT',
-        'UNI': 'UNIUSDT',
-        'ATOM': 'ATOMUSDT',
-        'NEAR': 'NEARUSDT',
-        'LTC': 'LTCUSDT',
-        'BCH': 'BCHUSDT',
-        'FIL': 'FILUSDT',
-        'ALGO': 'ALGOUSDT',
-        'VET': 'VETUSDT',
-        'ICP': 'ICPUSDT',
-        'HBAR': 'HBARUSDT',
-        'QNT': 'QNTUSDT',
-        'AAVE': 'AAVEUSDT',
-        'SUSHI': 'SUSHIUSDT',
-        'COMP': 'COMPUSDT',
-        'MKR': 'MKRUSDT',
-        'YFI': 'YFIUSDT',
-        'SNX': 'SNXUSDT',
-        'CRV': 'CRVUSDT',
-        'REN': 'RENUSDT',
-        'KNC': 'KNCUSDT',
-        'ZRX': 'ZRXUSDT',
-        'BAT': 'BATUSDT',
-        'MANA': 'MANAUSDT',
-        'SAND': 'SANDUSDT',
-        'AXS': 'AXSUSDT',
-        'GALA': 'GALAUSDT',
-        'ENJ': 'ENJUSDT',
-        'LRC': 'LRCUSDT',
-        'FTM': 'FTMUSDT',
-        'RUNE': 'RUNEUSDT',
-        'ONE': 'ONEUSDT',
-        'CELO': 'CELOUSDT',
-        'ALPHA': 'ALPHAUSDT',
-        'TFUEL': 'TFUELUSDT',
-        'GRT': 'GRTUSDT',
-        '1INCH': '1INCHUSDT',
-        'ANKR': 'ANKRUSDT',
-        'STORJ': 'STORJUSDT',
-        'COTI': 'COTIUSDT',
-        'MIR': 'MIRUSDT',
-        'RENDER': 'RENDERUSDT',
-        'RNDR': 'RNDRUSDT',
-        'AR': 'ARUSDT',
-        'ARPA': 'ARPAUSDT',
-        'TLM': 'TLMUSDT',
-        'BAKE': 'BAKEUSDT',
-        'BEL': 'BELUSDT',
-        'BLZ': 'BLZUSDT',
-        'BTS': 'BTSUSDT',
-        'CELR': 'CELRUSDT',
-        'CKB': 'CKBUSDT',
-        'DENT': 'DENTUSDT',
-        'DGB': 'DGBUSDT',
-        'FLM': 'FLMUSDT',
-        'HARD': 'HARDUSDT',
-        'IOST': 'IOSTUSDT',
-        'IOTX': 'IOTXUSDT',
-        'JST': 'JSTUSDT',
-        'LINA': 'LINAUSDT',
-        'LOOM': 'LOOMUSDT',
-        'MDT': 'MDTUSDT',
-        'MTL': 'MTLUSDT',
-        'NKN': 'NKNUSDT',
-        'NPXS': 'NPXSUSDT',
-        'OAX': 'OAXUSDT',
-        'ONT': 'ONTUSDT',
-        'QTUM': 'QTUMUSDT',
-        'RCN': 'RCNUSDT',
-        'RDN': 'RDNUSDT',
-        'REP': 'REPUSDT',
-        'RLC': 'RLCUSDT',
-        'SRM': 'SRMUSDT',
-        'STMX': 'STMXUSDT',
-        'STRAX': 'STRAXUSDT',
-        'TCT': 'TCTUSDT',
-        'TROY': 'TROYUSDT',
-        'TUSD': 'TUSDUSDT',
-        'USDP': 'USDPUSDT',
-        'USDD': 'USDDUSDT',
-        'DAI': 'DAIUSDT',
-        'USDC': 'USDCUSDT',
-        'USDT': 'USDTUSDT',
-        'BUSD': 'BUSDUSDT',
-        'FDUSD': 'FDUSDUSDT'
-      };
-
-      // Map coins to Binance symbols, fallback to coin + USDT if not in map
-      const binanceSymbols = coins.map(coin => symbolMap[coin] || `${coin}USDT`);
-      
-      console.log('Binance symbols to fetch:', binanceSymbols);
-
-      // Fetch prices from Binance API (supports up to 100 symbols per request)
-      const priceResponse = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(binanceSymbols))}`);
+      // Fetch prices from our Cloudflare Worker (no CORS issues)
+      const priceResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'action': 'get_prices'
+        },
+        body: JSON.stringify({ action: 'get_prices', coins })
+      });
       
       if (!priceResponse.ok) {
-        console.warn('Failed to fetch prices from Binance, trying individual requests');
-        // Fallback to individual requests
-        let totalUSD = 0;
-        for (const coin of coins) {
-          const symbol = symbolMap[coin] || `${coin}USDT`;
-          try {
-            const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
-            if (response.ok) {
-              const data = await response.json();
-              const price = parseFloat(data.price);
-              const amount = parseFloat(balances[coin]);
-              
-              if (amount > 0 && price > 0) {
-                const subtotal = amount * price;
-                totalUSD += subtotal;
-                console.log(`Coin: ${coin}, Amount: ${amount}, Price: $${price}, Subtotal: $${subtotal}`);
-              } else {
-                console.warn(`Skipping ${coin}: Amount=${amount}, Price=$${price}`);
-              }
-            }
-          } catch (error) {
-            console.error(`Failed to fetch price for ${coin}:`, error);
-          }
-        }
-        console.log('Fallback total USD value calculated:', totalUSD);
-        return totalUSD;
+        console.warn('Failed to fetch prices from worker, using fallback calculation');
+        return 0;
       }
 
       const priceData = await priceResponse.json();
-      console.log('Binance price data:', priceData);
+      console.log('Price data from worker:', priceData);
       
-      // Create a price lookup map: symbol -> price
-      const priceMap: Record<string, number> = {};
-      priceData.forEach((item: any) => {
-        if (item && item.symbol && item.price) {
-          // Convert symbol like "XRPUSDT" back to coin like "XRP"
-          const coin = item.symbol.replace('USDT', '').replace('BUSD', '').replace('FDUSD', '');
-          priceMap[coin] = parseFloat(item.price);
-        }
-      });
-      
-      console.log('Price map created:', priceMap);
-      
+      if (!priceData.prices) {
+        console.warn('No prices data in response');
+        return 0;
+      }
+
+      const prices = priceData.prices;
       let totalUSD = 0;
+      
       for (const coin of coins) {
         const amount = parseFloat(balances[coin]);
-        const price = priceMap[coin] || 0; // Fallback to 0 if price not found
+        const price = prices[coin] || 0; // Fallback to 0 if price not found
         
         if (amount > 0 && price > 0) {
           const subtotal = amount * price;

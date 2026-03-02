@@ -59,6 +59,194 @@ export default {
         });
       }
 
+      // ROUTE: Get coin prices from Binance
+      if (action === 'get_prices') {
+        try {
+          console.log("Handling price request");
+          
+          // Get coins from request body
+          const body = await request.json();
+          const coins = body.coins || [];
+          
+          if (coins.length === 0) {
+            return new Response(JSON.stringify({ error: 'No coins provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Symbol mapping for common coins
+          const symbolMap = {
+            'BTC': 'BTCUSDT',
+            'ETH': 'ETHUSDT',
+            'XRP': 'XRPUSDT',
+            'SOL': 'SOLUSDT',
+            'ADA': 'ADAUSDT',
+            'DOT': 'DOTUSDT',
+            'MATIC': 'MATICUSDT',
+            'AVAX': 'AVAXUSDT',
+            'LINK': 'LINKUSDT',
+            'UNI': 'UNIUSDT',
+            'ATOM': 'ATOMUSDT',
+            'NEAR': 'NEARUSDT',
+            'LTC': 'LTCUSDT',
+            'BCH': 'BCHUSDT',
+            'FIL': 'FILUSDT',
+            'ALGO': 'ALGOUSDT',
+            'VET': 'VETUSDT',
+            'ICP': 'ICPUSDT',
+            'HBAR': 'HBARUSDT',
+            'QNT': 'QNTUSDT',
+            'AAVE': 'AAVEUSDT',
+            'SUSHI': 'SUSHIUSDT',
+            'COMP': 'COMPUSDT',
+            'MKR': 'MKRUSDT',
+            'YFI': 'YFIUSDT',
+            'SNX': 'SNXUSDT',
+            'CRV': 'CRVUSDT',
+            'REN': 'RENUSDT',
+            'KNC': 'KNCUSDT',
+            'ZRX': 'ZRXUSDT',
+            'BAT': 'BATUSDT',
+            'MANA': 'MANAUSDT',
+            'SAND': 'SANDUSDT',
+            'AXS': 'AXSUSDT',
+            'GALA': 'GALAUSDT',
+            'ENJ': 'ENJUSDT',
+            'LRC': 'LRCUSDT',
+            'FTM': 'FTMUSDT',
+            'RUNE': 'RUNEUSDT',
+            'ONE': 'ONEUSDT',
+            'CELO': 'CELOUSDT',
+            'ALPHA': 'ALPHAUSDT',
+            'TFUEL': 'TFUELUSDT',
+            'GRT': 'GRTUSDT',
+            '1INCH': '1INCHUSDT',
+            'ANKR': 'ANKRUSDT',
+            'STORJ': 'STORJUSDT',
+            'COTI': 'COTIUSDT',
+            'MIR': 'MIRUSDT',
+            'RENDER': 'RENDERUSDT',
+            'RNDR': 'RNDRUSDT',
+            'AR': 'ARUSDT',
+            'ARPA': 'ARPAUSDT',
+            'TLM': 'TLMUSDT',
+            'BAKE': 'BAKEUSDT',
+            'BEL': 'BELUSDT',
+            'BLZ': 'BLZUSDT',
+            'BTS': 'BTSUSDT',
+            'CELR': 'CELRUSDT',
+            'CKB': 'CKBUSDT',
+            'DENT': 'DENTUSDT',
+            'DGB': 'DGBUSDT',
+            'FLM': 'FLMUSDT',
+            'HARD': 'HARDUSDT',
+            'IOST': 'IOSTUSDT',
+            'IOTX': 'IOTXUSDT',
+            'JST': 'JSTUSDT',
+            'LINA': 'LINAUSDT',
+            'LOOM': 'LOOMUSDT',
+            'MDT': 'MDTUSDT',
+            'MTL': 'MTLUSDT',
+            'NKN': 'NKNUSDT',
+            'NPXS': 'NPXSUSDT',
+            'OAX': 'OAXUSDT',
+            'ONT': 'ONTUSDT',
+            'QTUM': 'QTUMUSDT',
+            'RCN': 'RCNUSDT',
+            'RDN': 'RDNUSDT',
+            'REP': 'REPUSDT',
+            'RLC': 'RLCUSDT',
+            'SRM': 'SRMUSDT',
+            'STMX': 'STMXUSDT',
+            'STRAX': 'STRAXUSDT',
+            'TCT': 'TCTUSDT',
+            'TROY': 'TROYUSDT',
+            'TUSD': 'TUSDUSDT',
+            'USDP': 'USDPUSDT',
+            'USDD': 'USDDUSDT',
+            'DAI': 'DAIUSDT',
+            'USDC': 'USDCUSDT',
+            'USDT': 'USDTUSDT',
+            'BUSD': 'BUSDUSDT',
+            'FDUSD': 'FDUSDUSDT',
+            'PYUSD': 'PYUSDUSDT',
+            'TON': 'TONUSDT',
+            'LAVA': 'LAVAUSDT',
+            'BNB': 'BNBUSDT'
+          };
+
+          // Map coins to Binance symbols
+          const binanceSymbols = coins.map(coin => symbolMap[coin] || `${coin}USDT`);
+          
+          console.log('Fetching prices for symbols:', binanceSymbols);
+
+          // Fetch prices from Binance API
+          const priceResponse = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(binanceSymbols))}`);
+          
+          if (!priceResponse.ok) {
+            console.warn('Failed to fetch batch prices, trying individual requests');
+            // Fallback to individual requests
+            const prices = {};
+            for (const coin of coins) {
+              const symbol = symbolMap[coin] || `${coin}USDT`;
+              try {
+                const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+                if (response.ok) {
+                  const data = await response.json();
+                  prices[coin] = parseFloat(data.price);
+                  console.log(`${coin}: $${prices[coin]}`);
+                }
+              } catch (error) {
+                console.error(`Failed to fetch price for ${coin}:`, error);
+                prices[coin] = 0;
+              }
+            }
+            
+            return new Response(JSON.stringify({ prices }), {
+              status: 200,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json'
+              }
+            });
+          }
+
+          const priceData = await priceResponse.json();
+          console.log('Binance price data:', priceData);
+          
+          // Create a price lookup map: coin -> price
+          const prices = {};
+          priceData.forEach(item => {
+            if (item && item.symbol && item.price) {
+              // Convert symbol like "XRPUSDT" back to coin like "XRP"
+              const coin = item.symbol.replace('USDT', '').replace('BUSD', '').replace('FDUSD', '');
+              prices[coin] = parseFloat(item.price);
+            }
+          });
+          
+          console.log('Price map created:', prices);
+
+          return new Response(JSON.stringify({ prices }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("Price fetch error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to fetch prices',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // ROUTE: Portfolio fetch (API keys required)
       if (action === 'fetch_portfolio') {
         console.log("Handling portfolio fetch request");
