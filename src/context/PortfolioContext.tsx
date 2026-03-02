@@ -85,16 +85,20 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
         headers: {
           'Content-Type': 'application/json',
           'BYBIT_API_KEY': apiKey,
-          'BYBIT_API_SECRET': apiSecret
-        }
+          'BYBIT_API_SECRET': apiSecret,
+          'action': 'fetch_portfolio'
+        },
+        body: JSON.stringify({ action: 'fetch_portfolio' })
       })
 
       if (!response.ok) {
         const errorData = await response.json()
+        console.error('Portfolio fetch error response:', errorData)
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
       }
 
       const data = await response.json()
+      console.log("Portfolio data from Cloudflare Worker:", data)
 
       if (data?.balances?.result?.list && data.balances.result.list.length > 0) {
         const accountData = data.balances.result.list[0]
@@ -124,6 +128,7 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
         setError('No portfolio data found')
       }
     } catch (err) {
+      console.error('Portfolio fetch error:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch portfolio data')
     } finally {
       setIsLoading(false)
