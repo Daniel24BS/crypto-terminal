@@ -80,14 +80,23 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
     setError(null)
 
     try {
+      // Debug log headers being sent (mask keys for security)
+      const requestHeaders = {
+        'Content-Type': 'application/json',
+        'BYBIT_API_KEY': apiKey,
+        'BYBIT_API_SECRET': apiSecret,
+        'action': 'fetch_portfolio'
+      };
+      
+      console.log('Portfolio fetch headers:', {
+        ...requestHeaders,
+        'BYBIT_API_KEY': apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : 'MISSING',
+        'BYBIT_API_SECRET': apiSecret ? `${apiSecret.substring(0, 8)}...${apiSecret.substring(apiSecret.length - 4)}` : 'MISSING'
+      });
+
       const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'BYBIT_API_KEY': apiKey,
-          'BYBIT_API_SECRET': apiSecret,
-          'action': 'fetch_portfolio'
-        },
+        headers: requestHeaders,
         body: JSON.stringify({ action: 'fetch_portfolio' })
       })
 
