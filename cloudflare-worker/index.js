@@ -65,7 +65,6 @@ export default {
           console.log("Handling GET_TICKER request");
           
           // Get coin from request body
-          const body = await request.json();
           let coin = body.coin;
           
           if (!coin) {
@@ -138,7 +137,6 @@ export default {
           console.log("Handling price fetch request");
           
           // Get symbol from request body
-          const body = await request.json();
           const symbol = body.symbol;
           
           if (!symbol) {
