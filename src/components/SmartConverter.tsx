@@ -125,25 +125,28 @@ export default function SmartConverter() {
         console.log(`Using portfolio price for ${symbol}: $${rateUSD}`)
       } else {
         // Fetch price from Worker using GET_TICKER
-        console.log(`Fetching ticker for ${symbol} from Worker...`)
+        console.log("Fetching external price for:", symbol)
         setPriceLoading(true)
         
         try {
-          const tickerResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+          const tickerResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev/', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'action': 'GET_TICKER'
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({ action: 'GET_TICKER', coin: symbol })
           })
           
+          console.log("Worker response status:", tickerResponse.status)
+          
           if (tickerResponse.ok) {
             const tickerData = await tickerResponse.json()
+            console.log("Worker response data:", tickerData)
             rateUSD = tickerData.price || 0
             console.log(`Fetched ticker price for ${symbol}: $${rateUSD}`)
           } else {
-            console.warn(`Failed to fetch ticker for ${symbol}`)
+            const errorText = await tickerResponse.text()
+            console.error(`Failed to fetch ticker for ${symbol}. Status: ${tickerResponse.status}, Error: ${errorText}`)
           }
         } catch (error) {
           console.error(`Error fetching ticker for ${symbol}:`, error)
