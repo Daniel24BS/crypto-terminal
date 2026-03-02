@@ -198,31 +198,49 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
               const data = await response.json();
               const price = parseFloat(data.price);
               const amount = parseFloat(balances[coin]);
-              totalUSD += amount * price;
-              console.log(`${coin}: ${amount} * $${price} = $${amount * price}`);
+              
+              if (amount > 0 && price > 0) {
+                const subtotal = amount * price;
+                totalUSD += subtotal;
+                console.log(`Coin: ${coin}, Amount: ${amount}, Price: $${price}, Subtotal: $${subtotal}`);
+              } else {
+                console.warn(`Skipping ${coin}: Amount=${amount}, Price=$${price}`);
+              }
             }
           } catch (error) {
             console.error(`Failed to fetch price for ${coin}:`, error);
           }
         }
+        console.log('Fallback total USD value calculated:', totalUSD);
         return totalUSD;
       }
 
       const priceData = await priceResponse.json();
       console.log('Binance price data:', priceData);
       
+      // Create a price lookup map: symbol -> price
+      const priceMap: Record<string, number> = {};
+      priceData.forEach((item: any) => {
+        if (item && item.symbol && item.price) {
+          // Convert symbol like "XRPUSDT" back to coin like "XRP"
+          const coin = item.symbol.replace('USDT', '').replace('BUSD', '').replace('FDUSD', '');
+          priceMap[coin] = parseFloat(item.price);
+        }
+      });
+      
+      console.log('Price map created:', priceMap);
+      
       let totalUSD = 0;
-      for (let i = 0; i < coins.length; i++) {
-        const coin = coins[i];
+      for (const coin of coins) {
         const amount = parseFloat(balances[coin]);
-        const binanceData = priceData[i];
+        const price = priceMap[coin] || 0; // Fallback to 0 if price not found
         
-        if (binanceData && binanceData.price) {
-          const price = parseFloat(binanceData.price);
-          totalUSD += amount * price;
-          console.log(`${coin}: ${amount} * $${price} = $${amount * price}`);
+        if (amount > 0 && price > 0) {
+          const subtotal = amount * price;
+          totalUSD += subtotal;
+          console.log(`Coin: ${coin}, Amount: ${amount}, Price: $${price}, Subtotal: $${subtotal}`);
         } else {
-          console.warn(`No price data found for ${coin}`);
+          console.warn(`Skipping ${coin}: Amount=${amount}, Price=$${price}`);
         }
       }
 
@@ -303,16 +321,29 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
         console.log('Aggregated balances array:', aggregatedBalances);
 
         // Fetch current prices for USD value calculation
+        console.log('Starting USD value calculation...');
         const totalUSD = await calculateTotalUSDValue(data.balances as Record<string, string>);
+        console.log('USD calculation completed, totalUSD:', totalUSD);
+        
         const serverIlsRate = data.ilsRate || 3.65;
+        const totalILS = totalUSD * serverIlsRate;
+        
+        console.log('Final portfolio values:', {
+          totalUSD,
+          totalILS,
+          usdToIlsRate: serverIlsRate,
+          balanceCount: aggregatedBalances.length
+        });
 
         setBalances({
           unified: aggregatedBalances,
           fund: [],
           totalUSD,
-          totalILS: totalUSD * serverIlsRate,
+          totalILS,
           usdToIlsRate: serverIlsRate
         });
+        
+        console.log('Portfolio state updated successfully');
       } else {
         setError('No portfolio data found')
       }
