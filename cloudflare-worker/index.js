@@ -60,7 +60,7 @@ export default {
       }
 
       // ROUTE: Get coin prices from Bybit (public endpoint, no API keys required)
-      if (action === 'fetch_price') {
+      if (action === 'fetch_price' || action === 'get_market_price') {
         try {
           console.log("Handling price fetch request");
           
@@ -75,8 +75,8 @@ export default {
             });
           }
 
-          // Ensure symbol has USDT suffix
-          const tickerSymbol = symbol.endsWith('USDT') ? symbol : `${symbol}USDT`;
+          // Ensure symbol has USDT suffix and is uppercase
+          const tickerSymbol = symbol.toUpperCase().endsWith('USDT') ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
           
           console.log(`Fetching price for symbol: ${tickerSymbol}`);
 
@@ -84,6 +84,31 @@ export default {
           const priceResponse = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${tickerSymbol}`);
           
           if (!priceResponse.ok) {
+            // Try alternative endpoint if specific symbol fails
+            console.log(`Specific symbol failed, trying all tickers for ${symbol}...`);
+            const allTickersResponse = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
+            
+            if (allTickersResponse.ok) {
+              const allTickersData = await allTickersResponse.json();
+              const ticker = allTickersData?.result?.list?.find(t => t.symbol === tickerSymbol);
+              
+              if (ticker?.lastPrice) {
+                const price = parseFloat(ticker.lastPrice);
+                console.log(`Found price for ${tickerSymbol}: $${price}`);
+                
+                return new Response(JSON.stringify({ 
+                  symbol: tickerSymbol,
+                  price: price
+                }), {
+                  status: 200,
+                  headers: {
+                    ...corsHeaders,
+                    'Content-Type': 'application/json'
+                  }
+                });
+              }
+            }
+            
             throw new Error(`Failed to fetch price for ${tickerSymbol}`);
           }
 
@@ -94,6 +119,10 @@ export default {
           let price = 0;
           if (priceData?.result?.list?.[0]?.lastPrice) {
             price = parseFloat(priceData.result.list[0].lastPrice);
+          }
+
+          if (price === 0) {
+            throw new Error(`Price not available for ${tickerSymbol}`);
           }
 
           console.log(`Price for ${tickerSymbol}: $${price}`);
@@ -113,7 +142,8 @@ export default {
           console.error("Price fetch error:", error);
           return new Response(JSON.stringify({ 
             error: error.message || 'Failed to fetch price',
-            details: error.toString()
+            details: error.toString(),
+            symbol: body?.symbol || 'unknown'
           }), {
             status: 500,
             headers: corsHeaders

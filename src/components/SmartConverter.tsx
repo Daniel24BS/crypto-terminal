@@ -36,6 +36,7 @@ export default function SmartConverter() {
   const [selectedCoin, setSelectedCoin] = useState('solana')
   const [baseExchangeRate, setBaseExchangeRate] = useState(balances?.usdToIlsRate || 3.65)
   const [loading, setLoading] = useState(false)
+  const [priceLoading, setPriceLoading] = useState(false)
   const [result, setResult] = useState<ConversionResult | null>(null)
 
   const bybitFiatFee = 0.02
@@ -116,15 +117,16 @@ export default function SmartConverter() {
       } else {
         // Fetch price from Worker if not in portfolio
         console.log(`Fetching price for ${symbol} from Worker...`)
+        setPriceLoading(true)
         
         try {
           const priceResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'action': 'fetch_price'
+              'action': 'get_market_price'
             },
-            body: JSON.stringify({ action: 'fetch_price', symbol })
+            body: JSON.stringify({ action: 'get_market_price', symbol })
           })
           
           if (priceResponse.ok) {
@@ -136,11 +138,13 @@ export default function SmartConverter() {
           }
         } catch (error) {
           console.error(`Error fetching price for ${symbol}:`, error)
+        } finally {
+          setPriceLoading(false)
         }
       }
 
       if (rateUSD === 0) {
-        alert(`לא נמצא שער עדכני עבור ${symbol}. נסה מטבע אחר.`)
+        console.warn(`Price not available for ${symbol}`)
         return
       }
 
@@ -306,10 +310,10 @@ export default function SmartConverter() {
       <div className="space-y-3">
         <button
           onClick={calculate}
-          disabled={loading}
+          disabled={loading || priceLoading}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-medium py-3 px-4 rounded-lg transition-colors"
         >
-          {loading ? 'מחשב נתונים...' : 'חשב עסקה'}
+          {loading ? 'מחשב נתונים...' : priceLoading ? 'טוען מחיר...' : 'חשב עסקה'}
         </button>
         
         <button
