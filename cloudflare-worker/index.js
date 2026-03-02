@@ -204,7 +204,17 @@ export default {
           let totalUSD = 0;
 
           for (const [coin, amount] of Object.entries(aggregatedBalances)) {
-            const price = priceMap[coin] || 0;
+            let price = 0;
+            
+            // Handle stablecoins explicitly
+            if (['USDT', 'USDC', 'PYUSD', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FDUSD'].includes(coin)) {
+              price = 1.0;
+            } else {
+              // Look up price using coin + USDT symbol
+              const tickerSymbol = coin + 'USDT';
+              price = priceMap[tickerSymbol] || 0;
+            }
+            
             const usdValue = amount * price;
             
             if (amount > 0) {
@@ -221,17 +231,6 @@ export default {
               console.log(`${coin}: ${amount} × $${price} = $${usdValue}`);
             }
           }
-
-          // Add test asset for debugging
-          assets.push({
-            coin: "TEST",
-            total: "1",
-            available: "1", 
-            usdValue: 100,
-            price: 100,
-            unrealizedPnL: 0
-          });
-          totalUSD += 100;
 
           const totalILS = totalUSD * ilsRate;
 
