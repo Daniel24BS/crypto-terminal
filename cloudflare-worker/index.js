@@ -131,6 +131,68 @@ export default {
         }
       }
 
+      // ROUTE: Get kline data for mini-graphs (public endpoint, no API keys required)
+      if (action === 'GET_KLINE') {
+        try {
+          console.log("Handling GET_KLINE request");
+          
+          // Get symbol from request body
+          const symbol = body.symbol;
+          
+          if (!symbol) {
+            return new Response(JSON.stringify({ error: 'No symbol provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Ensure symbol has USDT suffix and is uppercase
+          const tradingSymbol = symbol.toUpperCase().includes('USDT') ? symbol.toUpperCase() : symbol.toUpperCase() + 'USDT';
+          console.log(`Fetching kline data for: ${tradingSymbol}`);
+
+          // Fetch last 20 hourly candles from Bybit
+          const response = await fetch(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${tradingSymbol}&interval=60&limit=20`);
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch kline data');
+          }
+
+          const data = await response.json();
+          console.log('Bybit kline data received');
+
+          // Extract closing prices from the kline data
+          const closingPrices = data?.result?.list?.map(candle => parseFloat(candle[4])) || [];
+          
+          if (closingPrices.length === 0) {
+            throw new Error(`No kline data found for ${tradingSymbol}`);
+          }
+
+          console.log(`Returning ${closingPrices.length} price points for ${tradingSymbol}`);
+          
+          return new Response(JSON.stringify({ 
+            symbol: tradingSymbol,
+            prices: closingPrices,
+            count: closingPrices.length
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("GET_KLINE error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to fetch kline data',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // ROUTE: Get coin prices from Bybit (public endpoint, no API keys required)
       if (action === 'fetch_price' || action === 'get_market_price') {
         try {

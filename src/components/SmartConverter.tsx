@@ -15,6 +15,14 @@ interface ConversionResult {
   resultLabel: string
 }
 
+interface Transaction {
+  date: string
+  fiatAmount: number
+  cryptoAmount: number
+  coin: string
+  fee: number
+}
+
 const coins: Coin[] = [
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', networkFee: 0.0002 },
   { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', networkFee: 0.0012 },
@@ -47,6 +55,11 @@ export default function SmartConverter() {
   const [loading, setLoading] = useState(false)
   const [priceLoading, setPriceLoading] = useState(false)
   const [result, setResult] = useState<ConversionResult | null>(null)
+  const [history, setHistory] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem('tx_history')
+    return saved ? JSON.parse(saved) : []
+  })
+  const [klineData, setKlineData] = useState<number[]>([])
 
   const bybitFiatFee = 0.02
 
@@ -241,6 +254,132 @@ export default function SmartConverter() {
     setCryptoValue('')
   }
 
+  const saveTransaction = () => {
+    if (!result) return
+    
+    const coin = coins.find(c => c.id === selectedCoin)
+    if (!coin) return
+    
+    const inputILS = parseFloat(ilsValue) || 0
+    const fee = calculateFee(inputILS)
+    let cryptoAmount = 0
+    
+    // Extract crypto amount from result
+    const cryptoMatch = result.finalResult.match(/([\d.]+)\s+(\w+)/)
+    if (cryptoMatch) {
+      cryptoAmount = parseFloat(cryptoMatch[1])
+    }
+    
+    const transaction: Transaction = {
+      date: new Date().toISOString(),
+      fiatAmount: inputILS,
+      cryptoAmount,
+      coin: coin.symbol,
+      fee
+    }
+    
+    const newHistory = [transaction, ...history].slice(0, 10) // Keep last 10
+    setHistory(newHistory)
+    localStorage.setItem('tx_history', JSON.stringify(newHistory))
+  }
+
+  // Auto-refresh price every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!selectedCoin) return
+      
+      const coin = coins.find(c => c.id === selectedCoin)
+      if (!coin) return
+      
+      try {
+        // Silent price fetch without loading indicator
+        const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'GET_TICKER', coin: coin.symbol })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.price) {
+            // Update price silently without affecting user input
+            setPriceLoading(false)
+          }
+        }
+      } catch (error) {
+        console.log('Auto-refresh failed:', error)
+      }
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [selectedCoin])
+
+  // Fetch kline data when coin changes
+  useEffect(() => {
+    const fetchKlineData = async () => {
+      const coin = coins.find(c => c.id === selectedCoin)
+      if (!coin) return
+      
+      try {
+        const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'GET_KLINE', symbol: coin.symbol })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.prices && Array.isArray(data.prices)) {
+            setKlineData(data.prices.reverse()) // Reverse for chronological order
+          }
+        }
+      } catch (error) {
+        console.log('Kline fetch failed:', error)
+      }
+    }
+
+    fetchKlineData()
+  }, [selectedCoin])
+
+  // Simple SVG sparkline component
+  const Sparkline = ({ data }: { data: number[] }) => {
+    if (data.length < 2) return null
+    
+    const width = 200
+    const height = 40
+    const padding = 2
+    
+    const min = Math.min(...data)
+    const max = Math.max(...data)
+    const range = max - min || 1
+    
+    const points = data.map((price, index) => {
+      const x = (index / (data.length - 1)) * (width - 2 * padding) + padding
+      const y = height - padding - ((price - min) / range) * (height - 2 * padding)
+      return `${x},${y}`
+    }).join(' ')
+    
+    const lastPrice = data[data.length - 1]
+    const firstPrice = data[0]
+    const isUp = lastPrice > firstPrice
+    
+    return (
+      <div className="flex items-center gap-2">
+        <svg width={width} height={height} className="opacity-80">
+          <polyline
+            points={points}
+            fill="none"
+            stroke={isUp ? '#10b981' : '#ef4444'}
+            strokeWidth="2"
+          />
+        </svg>
+        <span className={`text-xs ${isUp ? 'text-green-400' : 'text-red-400'}`}>
+          {isUp ? '↗' : '↘'} {((lastPrice - firstPrice) / firstPrice * 100).toFixed(1)}%
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-gray-900 rounded-xl p-6 shadow-xl">
       <div className="flex justify-between items-center mb-6">
@@ -317,6 +456,14 @@ export default function SmartConverter() {
             </option>
           ))}
         </select>
+        
+        {/* Mini Graph */}
+        {klineData.length > 1 && (
+          <div className="bg-gray-800 rounded-lg p-3">
+            <div className="text-xs text-gray-400 mb-2">מגמה 20 שעות אחרונות:</div>
+            <Sparkline data={klineData} />
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -359,6 +506,34 @@ export default function SmartConverter() {
           >
             📋 העתק סיכום ללקוח
           </button>
+
+          <button
+            onClick={saveTransaction}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+          >
+            💾 שמור עסקה
+          </button>
+        </div>
+      )}
+
+      {/* Transaction History */}
+      {history.length > 0 && (
+        <div className="mt-6 p-4 bg-gray-800 rounded-lg">
+          <h4 className="font-semibold mb-3 text-purple-400">📜 היסטוריית עסקאות</h4>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {history.map((tx, index) => (
+              <div key={index} className="text-xs text-gray-300 border-b border-gray-700 pb-2">
+                <div className="flex justify-between">
+                  <span>{new Date(tx.date).toLocaleDateString('he-IL')} {new Date(tx.date).toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'})}</span>
+                  <span className="text-purple-400">{tx.coin}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>₪{tx.fiatAmount.toFixed(2)} → {tx.cryptoAmount.toFixed(6)} {tx.coin}</span>
+                  <span className="text-green-400">עמלה: ₪{tx.fee.toFixed(2)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
