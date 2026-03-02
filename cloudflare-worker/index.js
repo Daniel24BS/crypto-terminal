@@ -91,6 +91,8 @@ export default {
 
         // Fetch portfolio data from multiple Bybit endpoints
         let aggregatedBalances = {};
+        let debugInfo = {}; // Declare at top level for scope
+        
         try {
           const timestamp = Date.now().toString();
           const recvWindow = '5000';
