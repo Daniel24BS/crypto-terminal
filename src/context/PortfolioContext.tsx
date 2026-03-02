@@ -79,33 +79,156 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
       const coins = Object.keys(balances).filter(coin => parseFloat(balances[coin]) > 0);
       if (coins.length === 0) return 0;
 
-      // Fetch prices from CoinGecko (limited to 100 coins per request)
-      const coinIds = coins.join(',');
-      const priceResponse = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`);
+      console.log('Fetching prices for coins:', coins);
+
+      // Symbol mapping for common coins (symbol -> Binance symbol)
+      const symbolMap: Record<string, string> = {
+        'BTC': 'BTCUSDT',
+        'ETH': 'ETHUSDT',
+        'XRP': 'XRPUSDT',
+        'SOL': 'SOLUSDT',
+        'ADA': 'ADAUSDT',
+        'DOT': 'DOTUSDT',
+        'MATIC': 'MATICUSDT',
+        'AVAX': 'AVAXUSDT',
+        'LINK': 'LINKUSDT',
+        'UNI': 'UNIUSDT',
+        'ATOM': 'ATOMUSDT',
+        'NEAR': 'NEARUSDT',
+        'LTC': 'LTCUSDT',
+        'BCH': 'BCHUSDT',
+        'FIL': 'FILUSDT',
+        'ALGO': 'ALGOUSDT',
+        'VET': 'VETUSDT',
+        'ICP': 'ICPUSDT',
+        'HBAR': 'HBARUSDT',
+        'QNT': 'QNTUSDT',
+        'AAVE': 'AAVEUSDT',
+        'SUSHI': 'SUSHIUSDT',
+        'COMP': 'COMPUSDT',
+        'MKR': 'MKRUSDT',
+        'YFI': 'YFIUSDT',
+        'SNX': 'SNXUSDT',
+        'CRV': 'CRVUSDT',
+        'REN': 'RENUSDT',
+        'KNC': 'KNCUSDT',
+        'ZRX': 'ZRXUSDT',
+        'BAT': 'BATUSDT',
+        'MANA': 'MANAUSDT',
+        'SAND': 'SANDUSDT',
+        'AXS': 'AXSUSDT',
+        'GALA': 'GALAUSDT',
+        'ENJ': 'ENJUSDT',
+        'LRC': 'LRCUSDT',
+        'FTM': 'FTMUSDT',
+        'RUNE': 'RUNEUSDT',
+        'ONE': 'ONEUSDT',
+        'CELO': 'CELOUSDT',
+        'ALPHA': 'ALPHAUSDT',
+        'TFUEL': 'TFUELUSDT',
+        'GRT': 'GRTUSDT',
+        '1INCH': '1INCHUSDT',
+        'ANKR': 'ANKRUSDT',
+        'STORJ': 'STORJUSDT',
+        'COTI': 'COTIUSDT',
+        'MIR': 'MIRUSDT',
+        'RENDER': 'RENDERUSDT',
+        'RNDR': 'RNDRUSDT',
+        'AR': 'ARUSDT',
+        'ARPA': 'ARPAUSDT',
+        'TLM': 'TLMUSDT',
+        'BAKE': 'BAKEUSDT',
+        'BEL': 'BELUSDT',
+        'BLZ': 'BLZUSDT',
+        'BTS': 'BTSUSDT',
+        'CELR': 'CELRUSDT',
+        'CKB': 'CKBUSDT',
+        'DENT': 'DENTUSDT',
+        'DGB': 'DGBUSDT',
+        'FLM': 'FLMUSDT',
+        'HARD': 'HARDUSDT',
+        'IOST': 'IOSTUSDT',
+        'IOTX': 'IOTXUSDT',
+        'JST': 'JSTUSDT',
+        'LINA': 'LINAUSDT',
+        'LOOM': 'LOOMUSDT',
+        'MDT': 'MDTUSDT',
+        'MTL': 'MTLUSDT',
+        'NKN': 'NKNUSDT',
+        'NPXS': 'NPXSUSDT',
+        'OAX': 'OAXUSDT',
+        'ONT': 'ONTUSDT',
+        'QTUM': 'QTUMUSDT',
+        'RCN': 'RCNUSDT',
+        'RDN': 'RDNUSDT',
+        'REP': 'REPUSDT',
+        'RLC': 'RLCUSDT',
+        'SRM': 'SRMUSDT',
+        'STMX': 'STMXUSDT',
+        'STRAX': 'STRAXUSDT',
+        'TCT': 'TCTUSDT',
+        'TROY': 'TROYUSDT',
+        'TUSD': 'TUSDUSDT',
+        'USDP': 'USDPUSDT',
+        'USDD': 'USDDUSDT',
+        'DAI': 'DAIUSDT',
+        'USDC': 'USDCUSDT',
+        'USDT': 'USDTUSDT',
+        'BUSD': 'BUSDUSDT',
+        'FDUSD': 'FDUSDUSDT'
+      };
+
+      // Map coins to Binance symbols, fallback to coin + USDT if not in map
+      const binanceSymbols = coins.map(coin => symbolMap[coin] || `${coin}USDT`);
+      
+      console.log('Binance symbols to fetch:', binanceSymbols);
+
+      // Fetch prices from Binance API (supports up to 100 symbols per request)
+      const priceResponse = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(binanceSymbols))}`);
       
       if (!priceResponse.ok) {
-        console.warn('Failed to fetch prices, using fallback calculation');
-        return 0;
+        console.warn('Failed to fetch prices from Binance, trying individual requests');
+        // Fallback to individual requests
+        let totalUSD = 0;
+        for (const coin of coins) {
+          const symbol = symbolMap[coin] || `${coin}USDT`;
+          try {
+            const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+            if (response.ok) {
+              const data = await response.json();
+              const price = parseFloat(data.price);
+              const amount = parseFloat(balances[coin]);
+              totalUSD += amount * price;
+              console.log(`${coin}: ${amount} * $${price} = $${amount * price}`);
+            }
+          } catch (error) {
+            console.error(`Failed to fetch price for ${coin}:`, error);
+          }
+        }
+        return totalUSD;
       }
 
       const priceData = await priceResponse.json();
+      console.log('Binance price data:', priceData);
       
       let totalUSD = 0;
-      for (const [coin, amount] of Object.entries(balances)) {
-        const coinAmount = parseFloat(amount);
-        if (coinAmount > 0) {
-          // Try to find price in CoinGecko data
-          const coinPrice = Object.values(priceData).find((price: any) => 
-            price && typeof price === 'object' && 'usd' in price
-          ) as any;
-          
-          if (coinPrice?.usd) {
-            totalUSD += coinAmount * coinPrice.usd;
-          }
+      for (let i = 0; i < coins.length; i++) {
+        const coin = coins[i];
+        const amount = parseFloat(balances[coin]);
+        const binanceData = priceData[i];
+        
+        if (binanceData && binanceData.price) {
+          const price = parseFloat(binanceData.price);
+          totalUSD += amount * price;
+          console.log(`${coin}: ${amount} * $${price} = $${amount * price}`);
+        } else {
+          console.warn(`No price data found for ${coin}`);
         }
       }
 
+      console.log('Total USD value calculated:', totalUSD);
       return totalUSD;
+
     } catch (error) {
       console.error('Error calculating USD value:', error);
       return 0;
