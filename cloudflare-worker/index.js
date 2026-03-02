@@ -59,6 +59,68 @@ export default {
         });
       }
 
+      // ROUTE: Get coin prices from Bybit (public endpoint, no API keys required)
+      if (action === 'fetch_price') {
+        try {
+          console.log("Handling price fetch request");
+          
+          // Get symbol from request body
+          const body = await request.json();
+          const symbol = body.symbol;
+          
+          if (!symbol) {
+            return new Response(JSON.stringify({ error: 'No symbol provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Ensure symbol has USDT suffix
+          const tickerSymbol = symbol.endsWith('USDT') ? symbol : `${symbol}USDT`;
+          
+          console.log(`Fetching price for symbol: ${tickerSymbol}`);
+
+          // Fetch price from Bybit public API (no API keys required)
+          const priceResponse = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${tickerSymbol}`);
+          
+          if (!priceResponse.ok) {
+            throw new Error(`Failed to fetch price for ${tickerSymbol}`);
+          }
+
+          const priceData = await priceResponse.json();
+          console.log('Bybit price data:', priceData);
+          
+          // Extract price from response
+          let price = 0;
+          if (priceData?.result?.list?.[0]?.lastPrice) {
+            price = parseFloat(priceData.result.list[0].lastPrice);
+          }
+
+          console.log(`Price for ${tickerSymbol}: $${price}`);
+
+          return new Response(JSON.stringify({ 
+            symbol: tickerSymbol,
+            price: price
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("Price fetch error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to fetch price',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // ROUTE: Portfolio fetch (API keys required)
       if (action === 'fetch_portfolio') {
         console.log("Handling portfolio fetch request");

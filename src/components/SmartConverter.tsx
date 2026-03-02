@@ -101,26 +101,51 @@ export default function SmartConverter() {
     setResult(null)
 
     try {
-      // Get coin price from portfolio context
+      // Get coin price from portfolio context first
       const coin = coins.find(c => c.id === selectedCoin)!
       const symbol = coin.symbol
+      let rateUSD = 0
+      
+      // Try to get price from portfolio first
       const portfolioAsset = balances?.unified?.find(asset => asset.coin === symbol)
       
-      if (!portfolioAsset) {
-        alert(`לא נמצא שער עדכני עבור ${symbol}. ודא שהפורטפוליו מעודכן.`)
-        return
+      if (portfolioAsset && (portfolioAsset as any).price && (portfolioAsset as any).price > 0) {
+        // Use portfolio price if available
+        rateUSD = (portfolioAsset as any).price
+        console.log(`Using portfolio price for ${symbol}: $${rateUSD}`)
+      } else {
+        // Fetch price from Worker if not in portfolio
+        console.log(`Fetching price for ${symbol} from Worker...`)
+        
+        try {
+          const priceResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'action': 'fetch_price'
+            },
+            body: JSON.stringify({ action: 'fetch_price', symbol })
+          })
+          
+          if (priceResponse.ok) {
+            const priceData = await priceResponse.json()
+            rateUSD = priceData.price || 0
+            console.log(`Fetched price for ${symbol}: $${rateUSD}`)
+          } else {
+            console.warn(`Failed to fetch price for ${symbol}`)
+          }
+        } catch (error) {
+          console.error(`Error fetching price for ${symbol}:`, error)
+        }
       }
-
-      // Access price property safely (it exists in Worker response)
-      const rateUSD = (portfolioAsset as any).price || 0
-      const rateILS = rateUSD * baseExchangeRate
 
       if (rateUSD === 0) {
-        alert(`שער המטבע ${symbol} הוא 0. ודא שהפורטפוליו מעודכן.`)
+        alert(`לא נמצא שער עדכני עבור ${symbol}. נסה מטבע אחר.`)
         return
       }
 
-      console.log(`Using portfolio price for ${symbol}: $${rateUSD} (₪${rateILS.toFixed(2)})`)
+      const rateILS = rateUSD * baseExchangeRate
+      console.log(`Final price for ${symbol}: $${rateUSD} (₪${rateILS.toFixed(2)})`)
 
       if (!isInverse) {
         // Fiat to Crypto mode
