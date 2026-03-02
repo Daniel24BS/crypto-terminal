@@ -16,15 +16,15 @@ interface ConversionResult {
 }
 
 const coins: Coin[] = [
+  { id: 'xrp', symbol: 'XRP', name: 'Ripple', networkFee: 0.2 },
   { id: 'solana', symbol: 'SOL', name: 'Solana', networkFee: 0.008 },
-  { id: 'tether', symbol: 'USDT', name: 'Tether', networkFee: 1.0 },
-  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', networkFee: 0.0002 },
-  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', networkFee: 0.0012 },
-  { id: 'ripple', symbol: 'XRP', name: 'Ripple', networkFee: 0.2 },
-  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', networkFee: 5.0 },
   { id: 'litecoin', symbol: 'LTC', name: 'Litecoin', networkFee: 0.001 },
   { id: 'pepe', symbol: 'PEPE', name: 'Pepe', networkFee: 500000 },
-  { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu', networkFee: 100000 }
+  { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu', networkFee: 100000 },
+  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', networkFee: 5.0 },
+  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', networkFee: 0.0002 },
+  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', networkFee: 0.0012 },
+  { id: 'cardano', symbol: 'ADA', name: 'Cardano', networkFee: 0.17 }
 ]
 
 export default function SmartConverter() {
@@ -48,12 +48,12 @@ export default function SmartConverter() {
     }
   }, [balances?.usdToIlsRate])
 
-  // New fee calculation rules
+  // New fee calculation rules (updated)
   const calculateFee = (amountILS: number): number => {
     if (amountILS > 200) {
       return amountILS * 0.10; // 10% for transactions > 200 ILS
     } else {
-      return 15; // Fixed 15 ILS for transactions <= 200 ILS
+      return 10; // Fixed 10 ILS for transactions <= 200 ILS
     }
   }
 
@@ -273,7 +273,7 @@ export default function SmartConverter() {
             שער בסיס (USDT): 1$ = {baseExchangeRate.toFixed(2)} ₪
           </div>
           <div className="text-xs text-blue-400 text-center bg-blue-900/20 rounded p-2">
-            💡 עמלה: 15 ש"ח עד 200 ש"ח, 10% מעל 200 ש"ח
+            💡 עמלה: 10 ש"ח עד 200 ש"ח, 10% מעל 200 ש"ח
           </div>
         </div>
       ) : (
@@ -353,7 +353,7 @@ export default function SmartConverter() {
       <div className="mt-6 p-4 bg-gray-800 rounded-lg">
         <h4 className="font-semibold mb-2 text-yellow-400">מבנה עמלות חדש</h4>
         <div className="text-sm text-gray-300 space-y-1">
-          <div>• <strong>עמלת שירות:</strong> 15₪ קבוע (עד 200₪) או 10% מהסכום (מעל 200₪)</div>
+          <div>• <strong>עמלת שירות:</strong> 10₪ קבוע (עד 200₪) או 10% מהסכום (מעל 200₪)</div>
           <div>• עמלת Bybit: 2%</div>
           <div>• עמלות רשת לפי מטבע</div>
           <div className="text-xs text-gray-400 mt-2">העמלה מחושבת אוטומטית לפי גודל העסקה</div>

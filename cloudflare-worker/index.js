@@ -66,7 +66,7 @@ export default {
           
           // Get coin from request body
           const body = await request.json();
-          const coin = body.coin;
+          let coin = body.coin;
           
           if (!coin) {
             return new Response(JSON.stringify({ error: 'No coin symbol provided' }), {
@@ -75,14 +75,26 @@ export default {
             });
           }
 
+          coin = coin.toUpperCase();
+          
           // Format symbol (uppercase + USDT suffix)
-          const symbol = coin.toUpperCase().endsWith('USDT') ? coin.toUpperCase() : `${coin.toUpperCase()}USDT`;
+          let symbol = coin.endsWith('USDT') ? coin : `${coin}USDT`;
           
           console.log(`Fetching ticker for: ${symbol}`);
 
           // Fetch single ticker from Bybit public API
-          const response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${symbol}`);
+          let response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${symbol}`);
           
+          if (!response.ok) {
+            // Try memecoin 1000 prefix for low-priced coins
+            if (!coin.startsWith('1000') && (coin === 'PEPE' || coin === 'SHIB')) {
+              const memecoinSymbol = `1000${coin}USDT`;
+              console.log(`Trying memecoin prefix: ${memecoinSymbol}`);
+              response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${memecoinSymbol}`);
+              symbol = memecoinSymbol;
+            }
+          }
+
           if (!response.ok) {
             throw new Error(`Failed to fetch ticker for ${symbol}`);
           }
@@ -103,7 +115,7 @@ export default {
           console.log(`Ticker price for ${symbol}: $${price}`);
 
           return new Response(JSON.stringify({ 
-            coin: coin.toUpperCase(),
+            coin,
             symbol,
             price
           }), {
