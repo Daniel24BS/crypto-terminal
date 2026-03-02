@@ -20,15 +20,11 @@ interface PortfolioContextType {
   loading: boolean
   error: string
   isConnected: boolean
-  apiKey: string
-  apiSecret: string
   usdToIlsRate: number
   setBalances: (balances: AccountBalance | null) => void
   setLoading: (loading: boolean) => void
   setError: (error: string) => void
   setIsConnected: (isConnected: boolean) => void
-  setApiKey: (apiKey: string) => void
-  setApiSecret: (apiSecret: string) => void
   setUsdToIlsRate: (rate: number) => void
   refreshPortfolio: () => void
 }
@@ -65,51 +61,15 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [isConnected, setIsConnected] = useState(false)
-  
-  // Initialize API keys from localStorage on mount
-  const [apiKey, setApiKey] = useState(() => {
-    return localStorage.getItem('bybit_api_key') || ''
-  })
-  const [apiSecret, setApiSecret] = useState(() => {
-    return localStorage.getItem('bybit_api_secret') || ''
-  })
   const [usdToIlsRate, setUsdToIlsRate] = useState(3.7)
 
-  // Save API keys to localStorage whenever they change
-  const handleSetApiKey = (key: string) => {
-    setApiKey(key)
-    if (key) {
-      localStorage.setItem('bybit_api_key', key)
-    } else {
-      localStorage.removeItem('bybit_api_key')
-    }
-  }
-
-  const handleSetApiSecret = (secret: string) => {
-    setApiSecret(secret)
-    if (secret) {
-      localStorage.setItem('bybit_api_secret', secret)
-    } else {
-      localStorage.removeItem('bybit_api_secret')
-    }
-  }
-
-  // Auto-fetch portfolio when API keys are available
+  // Auto-fetch portfolio on mount - no local key checks needed
   useEffect(() => {
-    // Check localStorage immediately on mount
-    const savedApiKey = localStorage.getItem('bybit_api_key')
-    const savedApiSecret = localStorage.getItem('bybit_api_secret')
-    
-    console.log("Mount check - saved keys:", { savedApiKey: !!savedApiKey, savedApiSecret: !!savedApiSecret })
-    
-    if (savedApiKey && savedApiSecret) {
-      console.log("Auto-fetch triggered with saved keys")
-      alert("I am trying to fetch data now!")
-      // Set connected state immediately
-      setIsConnected(true)
-      // Trigger portfolio fetch
-      refreshPortfolio()
-    }
+    console.log("Auto-fetch triggered from Cloudflare Worker")
+    // Set connected state immediately
+    setIsConnected(true)
+    // Trigger portfolio fetch
+    refreshPortfolio()
   }, []) // Empty dependency array ensures this runs only on mount
 
   // Auto-set connected state when fetch is successful
@@ -196,15 +156,11 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     loading,
     error,
     isConnected,
-    apiKey,
-    apiSecret,
     usdToIlsRate,
     setBalances,
     setLoading,
     setError,
     setIsConnected,
-    setApiKey: handleSetApiKey,
-    setApiSecret: handleSetApiSecret,
     setUsdToIlsRate,
     refreshPortfolio
   }
