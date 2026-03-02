@@ -131,6 +131,30 @@ export default {
             makeBybitRequest('/v5/earn/position', 'category=FlexibleSaving')
           ]);
 
+          // Collect debug info from all endpoints
+          const debugInfo = {
+            unified: unifiedData.status === 'fulfilled' ? {
+              raw: unifiedData.value,
+              retCode: unifiedData.value?.retCode,
+              retMsg: unifiedData.value?.retMsg
+            } : { error: unifiedData.reason },
+            spot: spotData.status === 'fulfilled' ? {
+              raw: spotData.value,
+              retCode: spotData.value?.retCode,
+              retMsg: spotData.value?.retMsg
+            } : { error: spotData.reason },
+            fund: fundData.status === 'fulfilled' ? {
+              raw: fundData.value,
+              retCode: fundData.value?.retCode,
+              retMsg: fundData.value?.retMsg
+            } : { error: fundData.reason },
+            earn: earnData.status === 'fulfilled' ? {
+              raw: earnData.value,
+              retCode: earnData.value?.retCode,
+              retMsg: earnData.value?.retMsg
+            } : { error: earnData.reason }
+          };
+
           // Log RAW responses from each endpoint
           console.log('=== RAW BYBIT RESPONSES ===');
           console.log('UNIFIED response:', unifiedData);
@@ -245,7 +269,8 @@ export default {
         // Return aggregated balances and ILS rate in structured response
         return new Response(JSON.stringify({
           balances: aggregatedBalances,
-          ilsRate
+          ilsRate,
+          debugInfo
         }), {
           status: 200,
           headers: {

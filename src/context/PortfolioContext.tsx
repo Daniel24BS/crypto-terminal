@@ -164,6 +164,7 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json()
       console.log("Portfolio data from Cloudflare Worker:", data)
       console.log('Portfolio data parsed:', JSON.stringify(data.balances, null, 2))
+      console.log("BYBIT RAW SERVER DEBUG:", data.debugInfo)
 
       if (data?.balances && typeof data.balances === 'object') {
         // Parse new aggregated structure: { balances: { "BTC": 0.5, "SOL": 12.3 } }
