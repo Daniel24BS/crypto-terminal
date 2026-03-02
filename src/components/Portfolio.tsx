@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { usePortfolio } from '../context/PortfolioContext'
+import ApiKeyModal from './ApiKeyModal'
 
 export default function Portfolio() {
   const { balances, loading, error, isConnected, apiKey, apiSecret, usdToIlsRate, setBalances, setIsConnected, setApiKey, setApiSecret, refreshPortfolio } = usePortfolio()
@@ -101,6 +102,10 @@ export default function Portfolio() {
           </div>
         </div>
       )}
+
+      {!apiKey || !apiSecret ? (
+        <ApiKeyModal />
+      ) : null}
 
       {balances && (
         <div className="space-y-6">

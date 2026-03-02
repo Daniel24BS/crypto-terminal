@@ -24,12 +24,12 @@ export default {
     }
 
     try {
-      // Get API keys from environment variables or headers
-      const apiKey = env.BYBIT_API_KEY || request.headers.get('BYBIT_API_KEY');
-      const apiSecret = env.BYBIT_API_SECRET || request.headers.get('BYBIT_API_SECRET');
+      // Get API keys from request headers (sent from frontend)
+      const apiKey = request.headers.get('BYBIT_API_KEY');
+      const apiSecret = request.headers.get('BYBIT_API_SECRET');
 
       if (!apiKey || !apiSecret) {
-        return new Response(JSON.stringify({ error: 'API keys not configured' }), {
+        return new Response(JSON.stringify({ error: 'API keys not provided' }), {
           status: 500,
           headers: corsHeaders
         });

@@ -20,11 +20,15 @@ interface PortfolioContextType {
   loading: boolean
   error: string
   isConnected: boolean
+  apiKey: string
+  apiSecret: string
   usdToIlsRate: number
   setBalances: (balances: AccountBalance | null) => void
   setLoading: (loading: boolean) => void
   setError: (error: string) => void
   setIsConnected: (isConnected: boolean) => void
+  setApiKey: (apiKey: string) => void
+  setApiSecret: (apiSecret: string) => void
   setUsdToIlsRate: (rate: number) => void
   refreshPortfolio: () => void
 }
@@ -61,15 +65,50 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [isConnected, setIsConnected] = useState(false)
+  
+  // Initialize API keys from localStorage on mount
+  const [apiKey, setApiKey] = useState(() => {
+    return localStorage.getItem('bybit_api_key') || ''
+  })
+  const [apiSecret, setApiSecret] = useState(() => {
+    return localStorage.getItem('bybit_api_secret') || ''
+  })
   const [usdToIlsRate, setUsdToIlsRate] = useState(3.7)
 
-  // Auto-fetch portfolio on mount - no local key checks needed
+  // Save API keys to localStorage whenever they change
+  const handleSetApiKey = (key: string) => {
+    setApiKey(key)
+    if (key) {
+      localStorage.setItem('bybit_api_key', key)
+    } else {
+      localStorage.removeItem('bybit_api_key')
+    }
+  }
+
+  const handleSetApiSecret = (secret: string) => {
+    setApiSecret(secret)
+    if (secret) {
+      localStorage.setItem('bybit_api_secret', secret)
+    } else {
+      localStorage.removeItem('bybit_api_secret')
+    }
+  }
+
+  // Auto-fetch portfolio when API keys are available
   useEffect(() => {
-    console.log("Auto-fetch triggered from Cloudflare Worker")
-    // Set connected state immediately
-    setIsConnected(true)
-    // Trigger portfolio fetch
-    refreshPortfolio()
+    // Check localStorage immediately on mount
+    const savedApiKey = localStorage.getItem('bybit_api_key')
+    const savedApiSecret = localStorage.getItem('bybit_api_secret')
+    
+    console.log("Mount check - saved keys:", { savedApiKey: !!savedApiKey, savedApiSecret: !!savedApiSecret })
+    
+    if (savedApiKey && savedApiSecret) {
+      console.log("Auto-fetch triggered with saved keys")
+      // Set connected state immediately
+      setIsConnected(true)
+      // Trigger portfolio fetch
+      refreshPortfolio()
+    }
   }, []) // Empty dependency array ensures this runs only on mount
 
   // Auto-set connected state when fetch is successful
@@ -87,14 +126,16 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       // Force cache busting - ensure we're using latest version
       const timestamp = Date.now()
       
-      // Call our Cloudflare Worker API - keys are now server-side
+      // Call our Cloudflare Worker API - pass API keys in headers
       console.log("Calling Cloudflare Worker API:", { timestamp })
       
       const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'BYBIT_API_KEY': apiKey,
+          'BYBIT_API_SECRET': apiSecret
         }
       })
 
@@ -106,8 +147,21 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       const data = await response.json()
       console.log("Portfolio data from Cloudflare Worker:", data)
 
-      if (data?.balances?.result?.list) {
+      // Debug the data structure
+      console.log("Data structure check:", {
+        hasBalances: !!data?.balances,
+        hasResult: !!data?.balances?.result,
+        hasList: !!data?.balances?.result?.list,
+        listLength: data?.balances?.result?.list?.length,
+        firstAccount: data?.balances?.result?.list?.[0],
+        hasCoin: !!data?.balances?.result?.list?.[0]?.coin
+      })
+
+      if (data?.balances?.result?.list && data.balances.result.list.length > 0) {
         const accountData = data.balances.result.list[0]
+        console.log("Account data:", accountData)
+        console.log("Coin array:", accountData.coin)
+        
         const unifiedBalances = accountData.coin.filter((coin: any) => 
           parseFloat(coin.walletBalance) > 0 || parseFloat(coin.unrealisedPnl) !== 0
         ).map((coin: any) => ({
@@ -119,6 +173,8 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
           usdValue: parseFloat(coin.walletBalance) * (coin.usdPrice || 0)
         }))
 
+        console.log("Processed unified balances:", unifiedBalances)
+
         const totalUSD = unifiedBalances.reduce((sum: number, balance: any) => 
           sum + balance.usdValue, 0
         )
@@ -126,15 +182,20 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
         // Use ILS rate from server response
         const serverIlsRate = data.ilsRate || 3.65
 
-        setBalances({
+        const newBalances = {
           unified: unifiedBalances,
           fund: [],
           totalUSD,
           totalILS: totalUSD * serverIlsRate,
           usdToIlsRate: serverIlsRate
-        })
+        }
+
+        console.log("Setting new balances state:", newBalances)
+        setBalances(newBalances)
         setIsConnected(true)
+        console.log("State updated successfully")
       } else {
+        console.log("No portfolio data found in expected structure")
         setError('No portfolio data found')
       }
     } catch (error) {
@@ -156,11 +217,15 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
     loading,
     error,
     isConnected,
+    apiKey,
+    apiSecret,
     usdToIlsRate,
     setBalances,
     setLoading,
     setError,
     setIsConnected,
+    setApiKey: handleSetApiKey,
+    setApiSecret: handleSetApiSecret,
     setUsdToIlsRate,
     refreshPortfolio
   }
