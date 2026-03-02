@@ -131,47 +131,105 @@ export default {
             makeBybitRequest('/v5/earn/position', 'category=FlexibleSaving')
           ]);
 
+          // Log RAW responses from each endpoint
+          console.log('=== RAW BYBIT RESPONSES ===');
+          console.log('UNIFIED response:', unifiedData);
+          console.log('SPOT response:', spotData);
+          console.log('FUND response:', fundData);
+          console.log('EARN response:', earnData);
+
           // Process UNIFIED account balances
-          if (unifiedData.status === 'fulfilled' && unifiedData.value?.result?.list?.[0]?.coin) {
-            unifiedData.value.result.list[0].coin.forEach(coin => {
-              const amount = parseFloat(coin.walletBalance) || 0;
-              if (amount > 0) {
-                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
-              }
-            });
+          if (unifiedData.status === 'fulfilled') {
+            console.log('UNIFIED raw data:', JSON.stringify(unifiedData.value, null, 2));
+            if (unifiedData.value?.result?.list?.[0]?.coin) {
+              unifiedData.value.result.list[0].coin.forEach(coin => {
+                const amount = parseFloat(coin.walletBalance) || 0;
+                if (amount > 0) {
+                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+                  console.log(`UNIFIED: Added ${coin.coin}: ${amount}`);
+                }
+              });
+            } else {
+              console.log('UNIFIED: No coin data found in expected path result.list[0].coin');
+            }
+          } else {
+            console.log('UNIFIED: Request failed:', unifiedData.reason);
           }
 
           // Process SPOT account balances
-          if (spotData.status === 'fulfilled' && spotData.value?.result?.list?.[0]?.coin) {
-            spotData.value.result.list[0].coin.forEach(coin => {
-              const amount = parseFloat(coin.walletBalance) || 0;
-              if (amount > 0) {
-                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
-              }
-            });
+          if (spotData.status === 'fulfilled') {
+            console.log('SPOT raw data:', JSON.stringify(spotData.value, null, 2));
+            if (spotData.value?.result?.list?.[0]?.coin) {
+              spotData.value.result.list[0].coin.forEach(coin => {
+                const amount = parseFloat(coin.walletBalance) || 0;
+                if (amount > 0) {
+                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+                  console.log(`SPOT: Added ${coin.coin}: ${amount}`);
+                }
+              });
+            } else {
+              console.log('SPOT: No coin data found in expected path result.list[0].coin');
+            }
+          } else {
+            console.log('SPOT: Request failed:', spotData.reason);
           }
 
-          // Process FUND account balances
-          if (fundData.status === 'fulfilled' && fundData.value?.result?.coins) {
-            fundData.value.result.coins.forEach(coin => {
-              const amount = parseFloat(coin.walletBalance) || 0;
-              if (amount > 0) {
-                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
-              }
-            });
+          // Process FUND account balances - DIFFERENT SCHEMA
+          if (fundData.status === 'fulfilled') {
+            console.log('FUND raw data:', JSON.stringify(fundData.value, null, 2));
+            if (fundData.value?.result?.coins) {
+              fundData.value.result.coins.forEach(coin => {
+                const amount = parseFloat(coin.walletBalance) || 0;
+                if (amount > 0) {
+                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+                  console.log(`FUND: Added ${coin.coin}: ${amount}`);
+                }
+              });
+            } else if (fundData.value?.result?.balance) {
+              // Alternative FUND schema path
+              fundData.value.result.balance.forEach(coin => {
+                const amount = parseFloat(coin.walletBalance) || 0;
+                if (amount > 0) {
+                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+                  console.log(`FUND (balance): Added ${coin.coin}: ${amount}`);
+                }
+              });
+            } else {
+              console.log('FUND: No coin data found in expected paths result.coins or result.balance');
+            }
+          } else {
+            console.log('FUND: Request failed:', fundData.reason);
           }
 
-          // Process EARN (Flexible Savings) balances
-          if (earnData.status === 'fulfilled' && earnData.value?.result?.list) {
-            earnData.value.result.list.forEach(position => {
-              const amount = parseFloat(position.amount) || 0;
-              if (amount > 0) {
-                aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
-              }
-            });
+          // Process EARN (Flexible Savings) balances - DIFFERENT SCHEMA
+          if (earnData.status === 'fulfilled') {
+            console.log('EARN raw data:', JSON.stringify(earnData.value, null, 2));
+            if (earnData.value?.result?.list) {
+              earnData.value.result.list.forEach(position => {
+                const amount = parseFloat(position.amount) || 0;
+                if (amount > 0) {
+                  aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
+                  console.log(`EARN: Added ${position.coin}: ${amount}`);
+                }
+              });
+            } else if (earnData.value?.result?.data) {
+              // Alternative EARN schema path
+              earnData.value.result.data.forEach(position => {
+                const amount = parseFloat(position.amount) || 0;
+                if (amount > 0) {
+                  aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
+                  console.log(`EARN (data): Added ${position.coin}: ${amount}`);
+                }
+              });
+            } else {
+              console.log('EARN: No position data found in expected paths result.list or result.data');
+            }
+          } else {
+            console.log('EARN: Request failed:', earnData.reason);
           }
 
-          console.log("Aggregated balances:", aggregatedBalances);
+          console.log('=== FINAL AGGREGATED BALANCES ===');
+          console.log('Aggregated balances:', JSON.stringify(aggregatedBalances, null, 2));
 
         } catch (bybitError) {
           console.error("Bybit API fetch error:", bybitError);
