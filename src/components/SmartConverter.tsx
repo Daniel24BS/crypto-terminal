@@ -47,7 +47,7 @@ export default function SmartConverter() {
     try {
       // Get ILS rate from our Cloudflare Worker API
       console.log("Fetching ILS rate from Cloudflare Worker...")
-      const response = await fetch('https://crypto-terminal.07daniel.workers.dev', {
+      const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -119,7 +119,7 @@ export default function SmartConverter() {
     try {
       // Fetch current coin rates from our Cloudflare Worker API
       console.log("Fetching coin rates from Cloudflare Worker...")
-      const response = await fetch('https://crypto-terminal.07daniel.workers.dev', {
+      const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

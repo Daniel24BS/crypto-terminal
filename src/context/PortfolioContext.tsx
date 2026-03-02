@@ -130,7 +130,7 @@ export const PortfolioProvider = ({ children }: { children: React.ReactNode }) =
       // Call our Cloudflare Worker API - keys are now server-side
       console.log("Calling Cloudflare Worker API:", { timestamp })
       
-      const response = await fetch('https://crypto-terminal.07daniel.workers.dev', {
+      const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
