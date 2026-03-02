@@ -72,63 +72,7 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  // Helper function to calculate total USD value from aggregated balances
-  const calculateTotalUSDValue = async (balances: Record<string, string>): Promise<number> => {
-    try {
-      // Get coin list for price fetching
-      const coins = Object.keys(balances).filter(coin => parseFloat(balances[coin]) > 0);
-      if (coins.length === 0) return 0;
-
-      console.log('Fetching prices for coins:', coins);
-
-      // Fetch prices from our Cloudflare Worker (no CORS issues)
-      const priceResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'action': 'get_prices'
-        },
-        body: JSON.stringify({ action: 'get_prices', coins })
-      });
-      
-      if (!priceResponse.ok) {
-        console.warn('Failed to fetch prices from worker, using fallback calculation');
-        return 0;
-      }
-
-      const priceData = await priceResponse.json();
-      console.log('Price data from worker:', priceData);
-      
-      if (!priceData.prices) {
-        console.warn('No prices data in response');
-        return 0;
-      }
-
-      const prices = priceData.prices;
-      let totalUSD = 0;
-      
-      for (const coin of coins) {
-        const amount = parseFloat(balances[coin]);
-        const price = prices[coin] || 0; // Fallback to 0 if price not found
-        
-        if (amount > 0 && price > 0) {
-          const subtotal = amount * price;
-          totalUSD += subtotal;
-          console.log(`Coin: ${coin}, Amount: ${amount}, Price: $${price}, Subtotal: $${subtotal}`);
-        } else {
-          console.warn(`Skipping ${coin}: Amount=${amount}, Price=$${price}`);
-        }
-      }
-
-      console.log('Total USD value calculated:', totalUSD);
-      return totalUSD;
-
-    } catch (error) {
-      console.error('Error calculating USD value:', error);
-      return 0;
-    }
-  }
-
+  
   // FETCH LOGIC: Only runs if keys exist
   const fetchPortfolio = async () => {
     if (!apiKey || !apiSecret) return
@@ -137,86 +81,43 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
     setError(null)
 
     try {
-      // Verification: Log that we have keys before sending request
-      const maskedKey = apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : 'MISSING';
-      const maskedSecret = apiSecret ? `${apiSecret.substring(0, 8)}...${apiSecret.substring(apiSecret.length - 4)}` : 'MISSING';
+      console.log('Fetching portfolio from Cloudflare Worker...')
       
-      console.log("Sending portfolio request with keys:", {
-        hasApiKey: !!apiKey,
-        hasApiSecret: !!apiSecret,
-        maskedKey,
-        maskedSecret,
-        keyLength: apiKey?.length || 0,
-        secretLength: apiSecret?.length || 0
-      });
-
-      // Debug log headers being sent (mask keys for security)
-      const requestHeaders = {
-        'Content-Type': 'application/json',
-        'BYBIT_API_KEY': apiKey,
-        'BYBIT_API_SECRET': apiSecret,
-        'action': 'fetch_portfolio'
-      };
-      
-      console.log('Portfolio fetch headers:', {
-        ...requestHeaders,
-        'BYBIT_API_KEY': maskedKey,
-        'BYBIT_API_SECRET': maskedSecret
-      });
-
-      console.log('Portfolio fetch body:', { action: 'fetch_portfolio' });
-
       const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
-        headers: requestHeaders,
+        headers: {
+          'Content-Type': 'application/json',
+          'BYBIT_API_KEY': apiKey,
+          'BYBIT_API_SECRET': apiSecret,
+          'action': 'fetch_portfolio'
+        },
         body: JSON.stringify({ action: 'fetch_portfolio' })
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Portfolio fetch error response:', errorData)
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const data = await response.json()
-      console.log("Portfolio data from Cloudflare Worker:", data)
-      console.log('Portfolio data parsed:', JSON.stringify(data.balances, null, 2))
-      console.log("BYBIT RAW SERVER DEBUG:", data.debugInfo)
+      console.log('Portfolio data from Cloudflare Worker:', data)
 
-      if (data?.balances && typeof data.balances === 'object') {
-        // Parse new aggregated structure: { balances: { "BTC": 0.5, "SOL": 12.3 } }
-        const aggregatedBalances = Object.entries(data.balances)
-          .filter(([, amount]) => parseFloat(amount as string) > 0)
-          .map(([coin, amount]) => ({
-            coin,
-            total: amount.toString(),
-            available: amount.toString(),
-            usdValue: 0 // Will be calculated below
-          }));
-
-        console.log('Aggregated balances array:', aggregatedBalances);
-
-        // Fetch current prices for USD value calculation
-        console.log('Starting USD value calculation...');
-        const totalUSD = await calculateTotalUSDValue(data.balances as Record<string, string>);
-        console.log('USD calculation completed, totalUSD:', totalUSD);
+      if (data?.assets && Array.isArray(data.assets)) {
+        // Use the complete portfolio object from Worker
+        const { assets, totalUSD, totalILS, ilsRate } = data;
         
-        const serverIlsRate = data.ilsRate || 3.65;
-        const totalILS = totalUSD * serverIlsRate;
-        
-        console.log('Final portfolio values:', {
+        console.log('Portfolio parsed:', {
+          assetCount: assets.length,
           totalUSD,
           totalILS,
-          usdToIlsRate: serverIlsRate,
-          balanceCount: aggregatedBalances.length
+          ilsRate
         });
 
         setBalances({
-          unified: aggregatedBalances,
+          unified: assets,
           fund: [],
           totalUSD,
           totalILS,
-          usdToIlsRate: serverIlsRate
+          usdToIlsRate: ilsRate
         });
         
         console.log('Portfolio state updated successfully');
