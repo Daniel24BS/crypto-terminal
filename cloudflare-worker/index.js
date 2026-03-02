@@ -61,18 +61,25 @@ export default {
       if (action === 'fetch_portfolio') {
         console.log("Handling portfolio fetch request");
         
+        // Initialize breadcrumb debugging
+        let debugInfo = { step0: 'worker_started' };
+        
         // Get API keys from request headers (sent from frontend)
+        debugInfo.step1 = 'checking_credentials';
         const apiKey = request.headers.get('BYBIT_API_KEY');
         const apiSecret = request.headers.get('BYBIT_API_SECRET');
 
         if (!apiKey || !apiSecret) {
-          return new Response(JSON.stringify({ error: 'API keys not provided' }), {
+          debugInfo.step1_error = 'missing_credentials';
+          return new Response(JSON.stringify({ error: 'API keys not provided', debugInfo }), {
             status: 400,
             headers: corsHeaders
           });
         }
+        debugInfo.step1_success = 'credentials_found';
 
         // Fetch ILS rate from public source (independent of Bybit keys)
+        debugInfo.step2 = 'fetching_ils_rate';
         let ilsRate = 3.65; // fallback
         try {
           console.log("Fetching ILS rate from server...");
@@ -84,21 +91,25 @@ export default {
               console.log("SUCCESS: Fetched ILS rate:", ilsRate);
             }
           }
+          debugInfo.step2_success = 'ils_rate_fetched';
         } catch (error) {
           console.error("Failed to fetch ILS rate:", error);
+          debugInfo.step2_error = error.message;
           // Keep fallback rate - don't crash
         }
 
         // Fetch portfolio data from multiple Bybit endpoints
+        debugInfo.step3 = 'starting_bybit_fetch';
         let aggregatedBalances = {};
-        let debugInfo = {}; // Declare at top level for scope
         
         try {
+          debugInfo.step4 = 'signature_generation_start';
           const timestamp = Date.now().toString();
           const recvWindow = '5000';
 
           // Helper function to make authenticated Bybit requests
           const makeBybitRequest = async (url, queryString) => {
+            debugInfo[`step5_${url.replace(/[^a-zA-Z0-9]/g, '_')}`] = 'making_request';
             const sign = await generateBybitSignature(queryString, timestamp, recvWindow, apiSecret);
             const fullUrl = `https://api.bybit.com${url}?${queryString}`;
             
@@ -126,6 +137,7 @@ export default {
           };
 
           // Make concurrent requests to all endpoints
+          debugInfo.step6 = 'making_concurrent_requests';
           const [unifiedData, spotData, fundData, earnData] = await Promise.allSettled([
             makeBybitRequest('/v5/account/wallet-balance', 'accountType=UNIFIED'),
             makeBybitRequest('/v5/account/wallet-balance', 'accountType=SPOT'),
@@ -134,28 +146,27 @@ export default {
           ]);
 
           // Collect debug info from all endpoints
-          const debugInfo = {
-            unified: unifiedData.status === 'fulfilled' ? {
-              raw: unifiedData.value,
-              retCode: unifiedData.value?.retCode,
-              retMsg: unifiedData.value?.retMsg
-            } : { error: unifiedData.reason },
-            spot: spotData.status === 'fulfilled' ? {
-              raw: spotData.value,
-              retCode: spotData.value?.retCode,
-              retMsg: spotData.value?.retMsg
-            } : { error: spotData.reason },
-            fund: fundData.status === 'fulfilled' ? {
-              raw: fundData.value,
-              retCode: fundData.value?.retCode,
-              retMsg: fundData.value?.retMsg
-            } : { error: fundData.reason },
-            earn: earnData.status === 'fulfilled' ? {
-              raw: earnData.value,
-              retCode: earnData.value?.retCode,
-              retMsg: earnData.value?.retMsg
-            } : { error: earnData.reason }
-          };
+          debugInfo.step7 = 'collecting_debug_info';
+          debugInfo.unified = unifiedData.status === 'fulfilled' ? {
+            raw: unifiedData.value,
+            retCode: unifiedData.value?.retCode,
+            retMsg: unifiedData.value?.retMsg
+          } : { error: unifiedData.reason };
+          debugInfo.spot = spotData.status === 'fulfilled' ? {
+            raw: spotData.value,
+            retCode: spotData.value?.retCode,
+            retMsg: spotData.value?.retMsg
+          } : { error: spotData.reason };
+          debugInfo.fund = fundData.status === 'fulfilled' ? {
+            raw: fundData.value,
+            retCode: fundData.value?.retCode,
+            retMsg: fundData.value?.retMsg
+          } : { error: fundData.reason };
+          debugInfo.earn = earnData.status === 'fulfilled' ? {
+            raw: earnData.value,
+            retCode: earnData.value?.retCode,
+            retMsg: earnData.value?.retMsg
+          } : { error: earnData.reason };
 
           // Log RAW responses from each endpoint
           console.log('=== RAW BYBIT RESPONSES ===');
@@ -259,8 +270,9 @@ export default {
 
         } catch (bybitError) {
           console.error("Bybit API fetch error:", bybitError);
-          debugInfo.fatalWorkerError = bybitError.message || bybitError.toString();
-          debugInfo.stack = bybitError.stack;
+          debugInfo.fatalError = bybitError.message || bybitError.toString();
+          debugInfo.errorName = bybitError.name || 'UnknownError';
+          debugInfo.errorStack = bybitError.stack || 'No stack available';
           return new Response(JSON.stringify({ 
             balances: {},
             ilsRate: 3.65,
