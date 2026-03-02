@@ -50,8 +50,10 @@ export default function SmartConverter() {
       const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'action': 'get_ils'
+        },
+        body: JSON.stringify({ action: 'get_ils' })
       })
 
       if (response.ok) {
