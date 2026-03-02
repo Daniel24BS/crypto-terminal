@@ -39,6 +39,15 @@ export default function SmartConverter() {
   const MINIMUM_FEE_ILS = 15
   const bybitFiatFee = 0.02
 
+  // New fee calculation rules
+  const calculateFee = (amountILS: number): number => {
+    if (amountILS > 200) {
+      return amountILS * 0.10; // 10% for transactions > 200 ILS
+    } else {
+      return 15; // Fixed 15 ILS for transactions <= 200 ILS
+    }
+  }
+
   useEffect(() => {
     initRate()
   }, [])
@@ -147,12 +156,11 @@ export default function SmartConverter() {
         try {
           if (!isInverse) {
             // Fiat to Crypto mode
-            let profitRate = inputILS < 400 ? 0.10 : 0.15
-            let myProfitILS = Math.max(inputILS * profitRate, MINIMUM_FEE_ILS)
+            const myProfitILS = calculateFee(inputILS)
 
             if (inputILS <= myProfitILS) {
               setLoading(false)
-              alert('הסכום נמוך מדי לעסקה (מכסה רק את המינימום רווח שלך שעומד על ${MINIMUM_FEE_ILS} ₪)')
+              alert('הסכום נמוך מדי לעסקה (מכסה רק את עמלת השירות שלך)')
               return
             }
 
@@ -161,6 +169,8 @@ export default function SmartConverter() {
             let finalToClient = cryptoBought - coin.networkFee
             if (finalToClient < 0) finalToClient = 0
 
+            const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
+            
             setResult({
               resultLabel: 'נטו ללקוח (אחרי עמלות):',
               finalResult: `${finalToClient.toFixed(5)} ${symbol}`,
@@ -168,9 +178,10 @@ export default function SmartConverter() {
               breakdown: `
                 <strong>פירוט עסקה מלא:</strong><br/>
                 • הלקוח שילם: ${formatFiat(inputILS, rateUSD / rateILS)}<br/>
-                • הרווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> ${myProfitILS === MINIMUM_FEE_ILS ? '(מינימום)' : ''}<br/>
+                • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
                 • תקציב קנייה (נטו): ${formatFiat(buyBudgetILS, rateUSD / rateILS)}<br/>
                 • עמלת רשת: ${coin.networkFee} ${symbol}<br/>
+                • עמלת Bybit: 2%<br/>
               `
             })
 
@@ -179,10 +190,10 @@ export default function SmartConverter() {
             let cryptoToBuy = inputCrypto + coin.networkFee
             let budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
             
-            let profitRate = budgetNeededILS < 360 ? 0.10 : 0.15
-            let calculatedProfitILS = (budgetNeededILS / (1 - profitRate)) - budgetNeededILS
-            let myProfitILS = Math.max(calculatedProfitILS, MINIMUM_FEE_ILS)
+            const myProfitILS = calculateFee(budgetNeededILS)
             let totalToPayILS = budgetNeededILS + myProfitILS
+
+            const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
 
             setResult({
               resultLabel: 'הלקוח צריך לשלם בסך הכל:',
@@ -191,8 +202,9 @@ export default function SmartConverter() {
               breakdown: `
                 <strong>פירוט עסקה (חישוב הפוך):</strong><br/>
                 • הלקוח יקבל: ${inputCrypto} ${symbol}<br/>
-                • הרווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> ${myProfitILS === MINIMUM_FEE_ILS ? '(מינימום)' : ''}<br/>
+                • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
                 • שער המטבע: 1 ${symbol} = ${rateILS.toFixed(2)} ₪ / $${rateUSD.toFixed(2)}<br/>
+                • עמלת Bybit: 2%<br/>
               `
             })
           }
@@ -343,12 +355,12 @@ export default function SmartConverter() {
       )}
 
       <div className="mt-6 p-4 bg-gray-800 rounded-lg">
-        <h4 className="font-semibold mb-2 text-yellow-400">מבנה עמלות</h4>
+        <h4 className="font-semibold mb-2 text-yellow-400">מבנה עמלות חדש</h4>
         <div className="text-sm text-gray-300 space-y-1">
-          <div>• רווח מינימלי: {MINIMUM_FEE_ILS} ₪</div>
-          <div>• מרווח עסקות: 10% (עד 400₪) / 15% (מעל 400₪)</div>
+          <div>• <strong>עמלת שירות:</strong> 15₪ קבוע (עד 200₪) או 10% מהסכום (מעל 200₪)</div>
           <div>• עמלת Bybit: 2%</div>
           <div>• עמלות רשת לפי מטבע</div>
+          <div className="text-xs text-gray-400 mt-2">העמלה מחושבת אוטומטית לפי גודל העסקה</div>
         </div>
       </div>
     </div>
