@@ -1,4 +1,6 @@
 // Cloudflare Worker for Crypto Trading Terminal API
+import crypto from 'node:crypto';
+
 export default {
   async fetch(request, env, ctx) {
     // Enable CORS
@@ -61,25 +63,18 @@ export default {
       if (action === 'fetch_portfolio') {
         console.log("Handling portfolio fetch request");
         
-        // Initialize breadcrumb debugging
-        let debugInfo = { step0: 'worker_started' };
-        
         // Get API keys from request headers (sent from frontend)
-        debugInfo.step1 = 'checking_credentials';
         const apiKey = request.headers.get('BYBIT_API_KEY');
         const apiSecret = request.headers.get('BYBIT_API_SECRET');
 
         if (!apiKey || !apiSecret) {
-          debugInfo.step1_error = 'missing_credentials';
-          return new Response(JSON.stringify({ error: 'API keys not provided', debugInfo }), {
+          return new Response(JSON.stringify({ error: 'API keys not provided' }), {
             status: 400,
             headers: corsHeaders
           });
         }
-        debugInfo.step1_success = 'credentials_found';
 
         // Fetch ILS rate from public source (independent of Bybit keys)
-        debugInfo.step2 = 'fetching_ils_rate';
         let ilsRate = 3.65; // fallback
         try {
           console.log("Fetching ILS rate from server...");
@@ -91,26 +86,21 @@ export default {
               console.log("SUCCESS: Fetched ILS rate:", ilsRate);
             }
           }
-          debugInfo.step2_success = 'ils_rate_fetched';
         } catch (error) {
           console.error("Failed to fetch ILS rate:", error);
-          debugInfo.step2_error = error.message;
           // Keep fallback rate - don't crash
         }
 
         // Fetch portfolio data from multiple Bybit endpoints
-        debugInfo.step3 = 'starting_bybit_fetch';
         let aggregatedBalances = {};
         
         try {
-          debugInfo.step4 = 'signature_generation_start';
           const timestamp = Date.now().toString();
           const recvWindow = '5000';
 
           // Helper function to make authenticated Bybit requests
           const makeBybitRequest = async (url, queryString) => {
-            debugInfo[`step5_${url.replace(/[^a-zA-Z0-9]/g, '_')}`] = 'making_request';
-            const sign = await generateBybitSignature(queryString, timestamp, recvWindow, apiSecret);
+            const sign = generateBybitSignature(queryString, timestamp, recvWindow, apiSecret);
             const fullUrl = `https://api.bybit.com${url}?${queryString}`;
             
             console.log(`Fetching from: ${fullUrl}`);
@@ -137,7 +127,6 @@ export default {
           };
 
           // Make concurrent requests to all endpoints
-          debugInfo.step6 = 'making_concurrent_requests';
           const [unifiedData, spotData, fundData, earnData] = await Promise.allSettled([
             makeBybitRequest('/v5/account/wallet-balance', 'accountType=UNIFIED'),
             makeBybitRequest('/v5/account/wallet-balance', 'accountType=SPOT'),
@@ -145,138 +134,53 @@ export default {
             makeBybitRequest('/v5/earn/position', 'category=FlexibleSaving')
           ]);
 
-          // Collect debug info from all endpoints
-          debugInfo.step7 = 'collecting_debug_info';
-          debugInfo.unified = unifiedData.status === 'fulfilled' ? {
-            raw: unifiedData.value,
-            retCode: unifiedData.value?.retCode,
-            retMsg: unifiedData.value?.retMsg
-          } : { error: unifiedData.reason };
-          debugInfo.spot = spotData.status === 'fulfilled' ? {
-            raw: spotData.value,
-            retCode: spotData.value?.retCode,
-            retMsg: spotData.value?.retMsg
-          } : { error: spotData.reason };
-          debugInfo.fund = fundData.status === 'fulfilled' ? {
-            raw: fundData.value,
-            retCode: fundData.value?.retCode,
-            retMsg: fundData.value?.retMsg
-          } : { error: fundData.reason };
-          debugInfo.earn = earnData.status === 'fulfilled' ? {
-            raw: earnData.value,
-            retCode: earnData.value?.retCode,
-            retMsg: earnData.value?.retMsg
-          } : { error: earnData.reason };
-
-          // Log RAW responses from each endpoint
-          console.log('=== RAW BYBIT RESPONSES ===');
-          console.log('UNIFIED response:', unifiedData);
-          console.log('SPOT response:', spotData);
-          console.log('FUND response:', fundData);
-          console.log('EARN response:', earnData);
-
           // Process UNIFIED account balances
-          if (unifiedData.status === 'fulfilled') {
-            console.log('UNIFIED raw data:', JSON.stringify(unifiedData.value, null, 2));
-            if (unifiedData.value?.result?.list?.[0]?.coin) {
-              unifiedData.value.result.list[0].coin.forEach(coin => {
-                const amount = parseFloat(coin.walletBalance) || 0;
-                if (amount > 0) {
-                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
-                  console.log(`UNIFIED: Added ${coin.coin}: ${amount}`);
-                }
-              });
-            } else {
-              console.log('UNIFIED: No coin data found in expected path result.list[0].coin');
-            }
-          } else {
-            console.log('UNIFIED: Request failed:', unifiedData.reason);
+          if (unifiedData.status === 'fulfilled' && unifiedData.value?.result?.list?.[0]?.coin) {
+            unifiedData.value.result.list[0].coin.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
           }
 
           // Process SPOT account balances
-          if (spotData.status === 'fulfilled') {
-            console.log('SPOT raw data:', JSON.stringify(spotData.value, null, 2));
-            if (spotData.value?.result?.list?.[0]?.coin) {
-              spotData.value.result.list[0].coin.forEach(coin => {
-                const amount = parseFloat(coin.walletBalance) || 0;
-                if (amount > 0) {
-                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
-                  console.log(`SPOT: Added ${coin.coin}: ${amount}`);
-                }
-              });
-            } else {
-              console.log('SPOT: No coin data found in expected path result.list[0].coin');
-            }
-          } else {
-            console.log('SPOT: Request failed:', spotData.reason);
+          if (spotData.status === 'fulfilled' && spotData.value?.result?.list?.[0]?.coin) {
+            spotData.value.result.list[0].coin.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
           }
 
-          // Process FUND account balances - DIFFERENT SCHEMA
-          if (fundData.status === 'fulfilled') {
-            console.log('FUND raw data:', JSON.stringify(fundData.value, null, 2));
-            if (fundData.value?.result?.coins) {
-              fundData.value.result.coins.forEach(coin => {
-                const amount = parseFloat(coin.walletBalance) || 0;
-                if (amount > 0) {
-                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
-                  console.log(`FUND: Added ${coin.coin}: ${amount}`);
-                }
-              });
-            } else if (fundData.value?.result?.balance) {
-              // Alternative FUND schema path
-              fundData.value.result.balance.forEach(coin => {
-                const amount = parseFloat(coin.walletBalance) || 0;
-                if (amount > 0) {
-                  aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
-                  console.log(`FUND (balance): Added ${coin.coin}: ${amount}`);
-                }
-              });
-            } else {
-              console.log('FUND: No coin data found in expected paths result.coins or result.balance');
-            }
-          } else {
-            console.log('FUND: Request failed:', fundData.reason);
+          // Process FUND account balances
+          if (fundData.status === 'fulfilled' && fundData.value?.result?.coins) {
+            fundData.value.result.coins.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
           }
 
-          // Process EARN (Flexible Savings) balances - DIFFERENT SCHEMA
-          if (earnData.status === 'fulfilled') {
-            console.log('EARN raw data:', JSON.stringify(earnData.value, null, 2));
-            if (earnData.value?.result?.list) {
-              earnData.value.result.list.forEach(position => {
-                const amount = parseFloat(position.amount) || 0;
-                if (amount > 0) {
-                  aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
-                  console.log(`EARN: Added ${position.coin}: ${amount}`);
-                }
-              });
-            } else if (earnData.value?.result?.data) {
-              // Alternative EARN schema path
-              earnData.value.result.data.forEach(position => {
-                const amount = parseFloat(position.amount) || 0;
-                if (amount > 0) {
-                  aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
-                  console.log(`EARN (data): Added ${position.coin}: ${amount}`);
-                }
-              });
-            } else {
-              console.log('EARN: No position data found in expected paths result.list or result.data');
-            }
-          } else {
-            console.log('EARN: Request failed:', earnData.reason);
+          // Process EARN (Flexible Savings) balances
+          if (earnData.status === 'fulfilled' && earnData.value?.result?.list) {
+            earnData.value.result.list.forEach(position => {
+              const amount = parseFloat(position.amount) || 0;
+              if (amount > 0) {
+                aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
+              }
+            });
           }
 
-          console.log('=== FINAL AGGREGATED BALANCES ===');
-          console.log('Aggregated balances:', JSON.stringify(aggregatedBalances, null, 2));
+          console.log("Aggregated balances:", aggregatedBalances);
 
         } catch (bybitError) {
           console.error("Bybit API fetch error:", bybitError);
-          debugInfo.fatalError = bybitError.message || bybitError.toString();
-          debugInfo.errorName = bybitError.name || 'UnknownError';
-          debugInfo.errorStack = bybitError.stack || 'No stack available';
           return new Response(JSON.stringify({ 
-            balances: {},
-            ilsRate: 3.65,
-            debugInfo
+            error: bybitError.message || 'Failed to fetch portfolio data from Bybit',
+            details: bybitError.toString()
           }), {
             status: 500,
             headers: corsHeaders
@@ -286,8 +190,7 @@ export default {
         // Return aggregated balances and ILS rate in structured response
         return new Response(JSON.stringify({
           balances: aggregatedBalances,
-          ilsRate,
-          debugInfo
+          ilsRate
         }), {
           status: 200,
           headers: {
@@ -316,65 +219,8 @@ export default {
   }
 };
 
-// Helper function to generate Bybit signature
-async function generateBybitSignature(queryString, timestamp, recvWindow, apiSecret) {
-  try {
-    const crypto = globalThis.crypto || (globalThis.webcrypto && globalThis.webcrypto.subtle);
-    if (!crypto) {
-      throw new Error('Crypto API not available in this environment');
-    }
-
-    const message = timestamp + recvWindow + queryString;
-    console.log('Signature generation debug:', {
-      timestamp,
-      recvWindow,
-      queryString,
-      message,
-      apiSecretLength: apiSecret.length
-    });
-
-    const encoder = new TextEncoder();
-    const keyData = encoder.encode(apiSecret);
-    const messageData = encoder.encode(message);
-
-    console.log('Encoded data debug:', {
-      keyDataType: keyData.constructor.name,
-      messageDataType: messageData.constructor.name,
-      keyDataLength: keyData.length,
-      messageDataLength: messageData.length
-    });
-
-    const key = await crypto.subtle.importKey(
-      'raw',
-      keyData,
-      { name: 'HMAC', hash: { name: 'SHA-256' } },
-      false,
-      ['sign']
-    );
-
-    console.log('Key import successful');
-
-    const signature = await crypto.subtle.sign(
-      { name: 'HMAC', hash: { name: 'SHA-256' } },
-      key,
-      messageData
-    );
-    
-    console.log('Signature generation successful, signature type:', signature.constructor.name);
-
-    const signatureArray = Array.from(new Uint8Array(signature));
-    const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
-    console.log('Final signature hex length:', signatureHex.length);
-    
-    return signatureHex;
-  } catch (error) {
-    console.error('Signature generation failed:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    throw error;
-  }
+// Helper function to generate Bybit signature using Node.js crypto
+function generateBybitSignature(queryString, timestamp, recvWindow, apiSecret) {
+  const message = timestamp + recvWindow + queryString;
+  return crypto.createHmac('sha256', apiSecret).update(message).digest('hex');
 }
