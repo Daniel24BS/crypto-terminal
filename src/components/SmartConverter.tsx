@@ -1,16 +1,6 @@
 import { useState, useEffect } from 'react'
 import { usePortfolio } from '../context/PortfolioContext'
 
-// Import the Coin interface from PortfolioContext
-interface PortfolioCoin {
-  coin: string
-  total: string
-  available: string
-  usdValue: number
-  price: number
-  unrealizedPnL: number
-}
-
 interface Coin {
   id: string
   symbol: string
@@ -114,15 +104,21 @@ export default function SmartConverter() {
       // Get coin price from portfolio context
       const coin = coins.find(c => c.id === selectedCoin)!
       const symbol = coin.symbol
-      const portfolioAsset = balances?.unified?.find(asset => asset.coin === symbol) as PortfolioCoin | undefined
+      const portfolioAsset = balances?.unified?.find(asset => asset.coin === symbol)
       
-      if (!portfolioAsset || portfolioAsset.price === 0) {
+      if (!portfolioAsset) {
         alert(`לא נמצא שער עדכני עבור ${symbol}. ודא שהפורטפוליו מעודכן.`)
         return
       }
 
-      const rateUSD = portfolioAsset.price
+      // Access price property safely (it exists in Worker response)
+      const rateUSD = (portfolioAsset as any).price || 0
       const rateILS = rateUSD * baseExchangeRate
+
+      if (rateUSD === 0) {
+        alert(`שער המטבע ${symbol} הוא 0. ודא שהפורטפוליו מעודכן.`)
+        return
+      }
 
       console.log(`Using portfolio price for ${symbol}: $${rateUSD} (₪${rateILS.toFixed(2)})`)
 
