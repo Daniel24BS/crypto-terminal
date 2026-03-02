@@ -102,12 +102,12 @@ export default function SmartConverter() {
     setResult(null)
 
     try {
-      // Get coin price from portfolio context first
+      // Get coin info
       const coin = coins.find(c => c.id === selectedCoin)!
       const symbol = coin.symbol
       let rateUSD = 0
       
-      // Try to get price from portfolio first
+      // Try to get price from portfolio first (faster)
       const portfolioAsset = balances?.unified?.find(asset => asset.coin === symbol)
       
       if (portfolioAsset && (portfolioAsset as any).price && (portfolioAsset as any).price > 0) {
@@ -115,29 +115,29 @@ export default function SmartConverter() {
         rateUSD = (portfolioAsset as any).price
         console.log(`Using portfolio price for ${symbol}: $${rateUSD}`)
       } else {
-        // Fetch price from Worker if not in portfolio
-        console.log(`Fetching price for ${symbol} from Worker...`)
+        // Fetch price from Worker using GET_TICKER
+        console.log(`Fetching ticker for ${symbol} from Worker...`)
         setPriceLoading(true)
         
         try {
-          const priceResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+          const tickerResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'action': 'get_market_price'
+              'action': 'GET_TICKER'
             },
-            body: JSON.stringify({ action: 'get_market_price', symbol })
+            body: JSON.stringify({ action: 'GET_TICKER', coin: symbol })
           })
           
-          if (priceResponse.ok) {
-            const priceData = await priceResponse.json()
-            rateUSD = priceData.price || 0
-            console.log(`Fetched price for ${symbol}: $${rateUSD}`)
+          if (tickerResponse.ok) {
+            const tickerData = await tickerResponse.json()
+            rateUSD = tickerData.price || 0
+            console.log(`Fetched ticker price for ${symbol}: $${rateUSD}`)
           } else {
-            console.warn(`Failed to fetch price for ${symbol}`)
+            console.warn(`Failed to fetch ticker for ${symbol}`)
           }
         } catch (error) {
-          console.error(`Error fetching price for ${symbol}:`, error)
+          console.error(`Error fetching ticker for ${symbol}:`, error)
         } finally {
           setPriceLoading(false)
         }

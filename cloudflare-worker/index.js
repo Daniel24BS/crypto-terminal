@@ -59,6 +59,73 @@ export default {
         });
       }
 
+      // ROUTE: Get single ticker price (public endpoint, no API keys required)
+      if (action === 'GET_TICKER') {
+        try {
+          console.log("Handling GET_TICKER request");
+          
+          // Get coin from request body
+          const body = await request.json();
+          const coin = body.coin;
+          
+          if (!coin) {
+            return new Response(JSON.stringify({ error: 'No coin symbol provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Format symbol (uppercase + USDT suffix)
+          const symbol = coin.toUpperCase().endsWith('USDT') ? coin.toUpperCase() : `${coin.toUpperCase()}USDT`;
+          
+          console.log(`Fetching ticker for: ${symbol}`);
+
+          // Fetch single ticker from Bybit public API
+          const response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${symbol}`);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ticker for ${symbol}`);
+          }
+
+          const data = await response.json();
+          console.log('Bybit ticker data:', data);
+          
+          // Extract price from response
+          let price = 0;
+          if (data?.result?.list?.[0]?.lastPrice) {
+            price = parseFloat(data.result.list[0].lastPrice);
+          }
+
+          if (price === 0) {
+            throw new Error(`Price not available for ${symbol}`);
+          }
+
+          console.log(`Ticker price for ${symbol}: $${price}`);
+
+          return new Response(JSON.stringify({ 
+            coin: coin.toUpperCase(),
+            symbol,
+            price
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("GET_TICKER error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to fetch ticker',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // ROUTE: Get coin prices from Bybit (public endpoint, no API keys required)
       if (action === 'fetch_price' || action === 'get_market_price') {
         try {
