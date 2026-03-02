@@ -1,11 +1,13 @@
-// Standalone HTML-based Crypto Calculator Worker
+// Cloudflare Worker for Crypto Trading Terminal API
+import crypto from 'node:crypto';
+
 export default {
   async fetch(request, env, ctx) {
     // Enable CORS
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, cache-control, X-BAPI-API-KEY, X-BAPI-SIGN, X-BAPI-SIGN-TYPE, X-BAPI-TIMESTAMP, X-BAPI-RECV-WINDOW, BYBIT_API_KEY, BYBIT_API_SECRET, action'
     };
 
     // Handle CORS preflight
@@ -16,15 +18,441 @@ export default {
       });
     }
 
-    // Return HTML page
-    const html = '<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>מחשבון מטבעות קריפטו</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#2d3748 100%);color:#e2e8f0;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}.calculator{background:#1e293b;border-radius:16px;padding:32px;box-shadow:0 20px 25px rgba(0,0,0,0.1);width:100%;max-width:480px;border:1px solid #334155}.title{text-align:center;font-size:24px;font-weight:700;margin-bottom:8px;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:transparent}.subtitle{text-align:center;color:#94a3b8;font-size:14px;margin-bottom:32px}.input-group{margin-bottom:20px}.label{display:block;font-size:14px;font-weight:500;margin-bottom:8px;color:#cbd5e1}.input-wrapper{position:relative}.input{width:100%;background:#374151;border:2px solid #4b5563;border-radius:8px;padding:16px;color:#f3f4f6;font-size:16px;transition:all .3s ease}.input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}.input-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#6b7280}.select{width:100%;background:#374151;border:2px solid #4b5563;border-radius:8px;padding:16px;color:#f3f4f6;font-size:16px;cursor:pointer}.button{width:100%;background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);border:none;border-radius:8px;padding:16px;color:white;font-size:16px;font-weight:600;cursor:pointer;transition:all .3s ease}.button:hover{transform:translateY(-2px);box-shadow:0 10px 20px rgba(59,130,246,0.3)}.button:disabled{opacity:.5;cursor:not-allowed;transform:none}.fee-info{background:#1e40af;border:1px solid #3b82f6;border-radius:8px;padding:12px;margin-bottom:20px;text-align:center}.fee-text{color:#60a5fa;font-size:12px;font-weight:500}.result{background:#065f46;border:1px solid #0d9488;border-radius:8px;padding:20px;margin-top:20px}.result-title{color:#10b981;font-size:14px;font-weight:600;margin-bottom:12px}.result-value{font-size:24px;font-weight:700;color:#34d399;margin-bottom:8px}.result-details{color:#6ee7b7;font-size:12px;line-height:1.5}.loading{text-align:center;color:#fbbf24;font-size:14px;padding:20px}.error{background:#991b1b;border:1px solid #dc2626;border-radius:8px;padding:16px;margin-top:20px;text-align:center;color:#f87171}</style></head><body><div class="calculator"><h1 class="title">מחשבון מטבעות קריפטו</h1><p class="subtitle">חישוב מהיר ומדויק עם עמלות שירות קבועות</p><div class="fee-info"><div class="fee-text">💡 עמלה: 10 ש"ח עד 200 ש"ח, 10% מעל 200 ש"ח</div></div><div class="input-group"><label class="label">סכום בשקלים (ILS):</label><div class="input-wrapper"><span class="input-icon">💰</span><input type="number" id="ilsAmount" class="input" placeholder="הכנס סכום" step="0.01"></div></div><div class="input-group"><label class="label">בחירת מטבע:</label><select id="coinSelect" class="select"><option value="BTC">Bitcoin (BTC)</option><option value="ETH">Ethereum (ETH)</option><option value="SOL">Solana (SOL)</option><option value="XRP">Ripple (XRP)</option><option value="LTC">Litecoin (LTC)</option><option value="ADA">Cardano (ADA)</option><option value="DOGE">Dogecoin (DOGE)</option><option value="SHIB">Shiba Inu (SHIB)</option><option value="PEPE">Pepe (PEPE)</option><option value="AVAX">Avalanche (AVAX)</option><option value="DOT">Polkadot (DOT)</option><option value="LINK">Chainlink (LINK)</option><option value="NEAR">NEAR Protocol (NEAR)</option><option value="BCH">Bitcoin Cash (BCH)</option><option value="FET">Fetch.ai (FET)</option><option value="INJ">Injective (INJ)</option><option value="KAS">Kaspa (KAS)</option><option value="TON">Toncoin (TON)</option></select></div><button id="calculateBtn" class="button" onclick="calculate()">חשב עסקה</button><div id="result"></div></div><script>const MINIMUM_FEE_ILS=10;const BYBIT_FEE_RATE=0.02;const NETWORK_FEES={BTC:0.0002,ETH:0.0012,SOL:0.008,XRP:0.2,LTC:0.001,ADA:0.17,DOGE:5.0,SHIB:100000,PEPE:500000,AVAX:0.001,DOT:0.1,LINK:0.01,NEAR:0.025,BCH:0.0001,FET:0.1,INJ:0.01,KAS:0.1,TON:0.05};async function fetchTicker(coin){try{console.log("Fetching ticker for: "+coin);const response=await fetch("https://api.bybit.com/v5/market/tickers?category=spot");if(!response.ok){throw new Error("Failed to fetch spot tickers")}const data=await response.json();console.log("Bybit tickers data received");const target1=coin+"USDT";const target2="1000"+coin+"USDT";const target3=coin;const ticker=data?.result?.list?.find(t=>t.symbol===target1||t.symbol===target2||t.symbol===target3||t.symbol===coin);if(!ticker||!ticker.lastPrice){throw new Error("Ticker not found for "+coin+" (tried: "+target1+", "+target2+", "+target3+")")}const price=parseFloat(ticker.lastPrice);console.log("Found ticker "+ticker.symbol+": $"+price);return{coin,symbol:ticker.symbol,price}}catch(error){console.error("GET_TICKER error:",error);return null}}async function getILSRate(){try{const response=await fetch("https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils");if(response.ok){const data=await response.json();if(data?.tether?.ils){return data.tether.ils}}}catch(error){console.error("Failed to fetch ILS rate:",error)}return 3.65}async function calculate(){const ilsAmount=parseFloat(document.getElementById("ilsAmount").value);const selectedCoin=document.getElementById("coinSelect").value;const resultDiv=document.getElementById("result");if(!ilsAmount||ilsAmount<=0){resultDiv.innerHTML="<div class=\\"error\\">אנא הכנס סכום תקין</div>";return}resultDiv.innerHTML="<div class=\\"loading\\">טוען מחיר...</div>";try{const ilsRate=await getILSRate();const tickerData=await fetchTicker(selectedCoin);if(!tickerData){resultDiv.innerHTML="<div class=\\"error\\">לא נמצא מחיר עדכן עבור "+selectedCoin+". נסה מטבע אחר.</div>";return}const{price:usdPrice}=tickerData;const ilsRatePerCoin=usdPrice*ilsRate;let myProfitILS;if(ilsAmount>200){myProfitILS=ilsAmount*0.10}else{myProfitILS=MINIMUM_FEE_ILS}if(ilsAmount<=myProfitILS){resultDiv.innerHTML="<div class=\\"error\\">הסכום נמוך מדי לעסקה (מכסה רק את עמלת השירות שלך)</div>";return}const buyBudgetILS=ilsAmount-myProfitILS;const cryptoBought=(buyBudgetILS*(1-BYBIT_FEE_RATE))/ilsRatePerCoin;const networkFee=NETWORK_FEES[selectedCoin]||0;let finalToClient=cryptoBought-networkFee;if(finalToClient<0)finalToClient=0;const feeType=ilsAmount>200?"10% מהסכום":"עמלה קבועה של 10₪";resultDiv.innerHTML="<div class=\\"result\\"><div class=\\"result-title\\">כמות שתקבל ללקוח (אחר עמלות):</div><div class=\\"result-value\\">"+finalToClient.toFixed(6)+" "+selectedCoin+"</div><div class=\\"result-details\\"><strong>פירוט עסקה מלא:</strong><br/>• הלקוח שילם: "+ilsAmount.toFixed(2)+" ₪ ($"+(ilsAmount/ilsRate).toFixed(2)+")<br/>• עמלת שירות שלך: <span style=\\"color: #10b981;\\">"+myProfitILS.toFixed(2)+" ₪</span> ("+feeType+")<br/>• תקציב קנייה (נטו): "+buyBudgetILS.toFixed(2)+" ₪<br/>• כמות שנקפתה: "+cryptoBought.toFixed(6)+" "+selectedCoin+"<br/>• עמלת רשת: "+networkFee+" "+selectedCoin+"<br/>• עמלת Bybit: 2%<br/>• סה\\"כ ללקוח: <strong>"+finalToClient.toFixed(6)+" "+selectedCoin+"</strong></div></div>"}catch(error){console.error("Calculation error:",error);resultDiv.innerHTML="<div class=\\"error\\">שגיאה בחישוב - נסה שוב מאוחר</div>}}document.addEventListener("DOMContentLoaded",function(){document.getElementById("coinSelect").value="SOL"});</script></body></html>';
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: corsHeaders
+      });
+    }
 
-    return new Response(html, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/html; charset=utf-8'
+    try {
+      // Parse request body to determine action
+      const body = await request.json().catch(() => ({}));
+      const action = body.action || request.headers.get('action') || 'fetch_portfolio';
+
+      console.log("Worker action:", action);
+
+      // ROUTE: ILS rate fetch (no API keys required)
+      if (action === 'get_ils') {
+        console.log("Handling ILS rate request");
+        let ilsRate = 3.65; // fallback
+        try {
+          const ilsResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils');
+          if (ilsResponse.ok) {
+            const ilsData = await ilsResponse.json();
+            if (ilsData?.tether?.ils) {
+              ilsRate = ilsData.tether.ils;
+              console.log("SUCCESS: Fetched ILS rate:", ilsRate);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch ILS rate:", error);
+          // Keep fallback rate - don't crash
+        }
+
+        return new Response(JSON.stringify({ ilsRate }), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
       }
-    });
+
+      // ROUTE: Get single ticker price (public endpoint, no API keys required)
+      if (action === 'GET_TICKER') {
+        try {
+          console.log("Handling GET_TICKER request");
+          
+          // Get coin from request body
+          const body = await request.json();
+          let coin = body.coin;
+          
+          if (!coin) {
+            return new Response(JSON.stringify({ error: 'No coin symbol provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          coin = coin.toUpperCase();
+          console.log(`Searching for ticker for: ${coin}`);
+
+          // Fetch ALL spot tickers at once (bulletproof approach)
+          const response = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch spot tickers');
+          }
+
+          const data = await response.json();
+          console.log('Bybit tickers data received');
+
+          // Intelligent symbol search with multiple variations
+          const target1 = `${coin}USDT`;
+          const target2 = `1000${coin}USDT`;
+          const target3 = coin; // In case coin already includes USDT
+          
+          // Search for matching ticker
+          const ticker = data?.result?.list?.find(t => 
+            t.symbol === target1 || 
+            t.symbol === target2 || 
+            t.symbol === target3 ||
+            t.symbol === coin
+          );
+
+          if (!ticker || !ticker.lastPrice) {
+            throw new Error(`Ticker not found for ${coin} (tried: ${target1}, ${target2}, ${target3})`);
+          }
+
+          const price = parseFloat(ticker.lastPrice);
+          console.log(`Found ticker ${ticker.symbol}: $${price}`);
+
+          return new Response(JSON.stringify({ 
+            coin,
+            symbol: ticker.symbol,
+            price
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("GET_TICKER error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to fetch ticker',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // ROUTE: Get coin prices from Bybit (public endpoint, no API keys required)
+      if (action === 'fetch_price' || action === 'get_market_price') {
+        try {
+          console.log("Handling price fetch request");
+          
+          // Get symbol from request body
+          const body = await request.json();
+          const symbol = body.symbol;
+          
+          if (!symbol) {
+            return new Response(JSON.stringify({ error: 'No symbol provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Ensure symbol has USDT suffix and is uppercase
+          const tickerSymbol = symbol.toUpperCase().endsWith('USDT') ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`;
+          
+          console.log(`Fetching price for symbol: ${tickerSymbol}`);
+
+          // Fetch price from Bybit public API (no API keys required)
+          const priceResponse = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${tickerSymbol}`);
+          
+          if (!priceResponse.ok) {
+            // Try alternative endpoint if specific symbol fails
+            console.log(`Specific symbol failed, trying all tickers for ${symbol}...`);
+            const allTickersResponse = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
+            
+            if (allTickersResponse.ok) {
+              const allTickersData = await allTickersResponse.json();
+              const ticker = allTickersData?.result?.list?.find(t => t.symbol === tickerSymbol);
+              
+              if (ticker?.lastPrice) {
+                const price = parseFloat(ticker.lastPrice);
+                console.log(`Found price for ${tickerSymbol}: $${price}`);
+                
+                return new Response(JSON.stringify({ 
+                  symbol: tickerSymbol,
+                  price: price
+                }), {
+                  status: 200,
+                  headers: {
+                    ...corsHeaders,
+                    'Content-Type': 'application/json'
+                  }
+                });
+              }
+            }
+            
+            throw new Error(`Failed to fetch price for ${tickerSymbol}`);
+          }
+
+          const priceData = await priceResponse.json();
+          console.log('Bybit price data:', priceData);
+          
+          // Extract price from response
+          let price = 0;
+          if (priceData?.result?.list?.[0]?.lastPrice) {
+            price = parseFloat(priceData.result.list[0].lastPrice);
+          }
+
+          if (price === 0) {
+            throw new Error(`Price not available for ${tickerSymbol}`);
+          }
+
+          console.log(`Price for ${tickerSymbol}: $${price}`);
+
+          return new Response(JSON.stringify({ 
+            symbol: tickerSymbol,
+            price: price
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("Price fetch error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to fetch price',
+            details: error.toString(),
+            symbol: body?.symbol || 'unknown'
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // ROUTE: Portfolio fetch (API keys required)
+      if (action === 'fetch_portfolio') {
+        console.log("Handling portfolio fetch request");
+        
+        // Get API keys from request headers (sent from frontend)
+        const apiKey = request.headers.get('BYBIT_API_KEY');
+        const apiSecret = request.headers.get('BYBIT_API_SECRET');
+
+        if (!apiKey || !apiSecret) {
+          return new Response(JSON.stringify({ error: 'API keys not provided' }), {
+            status: 400,
+            headers: corsHeaders
+          });
+        }
+
+        // Fetch ILS rate from public source (independent of Bybit keys)
+        let ilsRate = 3.65; // fallback
+        try {
+          console.log("Fetching ILS rate from server...");
+          const ilsResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils');
+          if (ilsResponse.ok) {
+            const ilsData = await ilsResponse.json();
+            if (ilsData?.tether?.ils) {
+              ilsRate = ilsData.tether.ils;
+              console.log("SUCCESS: Fetched ILS rate:", ilsRate);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch ILS rate:", error);
+          // Keep fallback rate - don't crash
+        }
+
+        // Fetch portfolio data from multiple Bybit endpoints
+        let aggregatedBalances = {};
+        
+        try {
+          const timestamp = Date.now().toString();
+          const recvWindow = '5000';
+
+          // Helper function to make authenticated Bybit requests
+          const makeBybitRequest = async (url, queryString) => {
+            const sign = generateBybitSignature(queryString, timestamp, recvWindow, apiKey, apiSecret);
+            const fullUrl = `https://api.bybit.com${url}?${queryString}`;
+            
+            console.log(`Fetching from: ${fullUrl}`);
+            
+            const response = await fetch(fullUrl, {
+              method: 'GET',
+              headers: {
+                'X-BAPI-API-KEY': apiKey,
+                'X-BAPI-SIGN': sign,
+                'X-BAPI-SIGN-TYPE': '2',
+                'X-BAPI-TIMESTAMP': timestamp,
+                'X-BAPI-RECV-WINDOW': recvWindow,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`Bybit API error for ${url}:`, errorText);
+              throw new Error(`Bybit API error! status: ${response.status}, response: ${errorText}`);
+            }
+
+            return await response.json();
+          };
+
+          // Make concurrent requests to all endpoints
+          const [unifiedData, spotData, fundData, earnData] = await Promise.allSettled([
+            makeBybitRequest('/v5/account/wallet-balance', 'accountType=UNIFIED'),
+            makeBybitRequest('/v5/account/wallet-balance', 'accountType=SPOT'),
+            makeBybitRequest('/v5/asset/transfer/query-account-coins-balance', 'accountType=FUND'),
+            makeBybitRequest('/v5/earn/position', 'category=FlexibleSaving')
+          ]);
+
+          // Process UNIFIED account balances
+          if (unifiedData.status === 'fulfilled' && unifiedData.value?.result?.list?.[0]?.coin) {
+            unifiedData.value.result.list[0].coin.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
+          }
+
+          // Process SPOT account balances
+          if (spotData.status === 'fulfilled' && spotData.value?.result?.list?.[0]?.coin) {
+            spotData.value.result.list[0].coin.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
+          }
+
+          // Process FUND account balances
+          if (fundData.status === 'fulfilled' && fundData.value?.result?.coins) {
+            fundData.value.result.coins.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
+          }
+
+          // Process EARN (Flexible Savings) balances
+          if (earnData.status === 'fulfilled' && earnData.value?.result?.list) {
+            earnData.value.result.list.forEach(position => {
+              const amount = parseFloat(position.amount) || 0;
+              if (amount > 0) {
+                aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
+              }
+            });
+          }
+
+          console.log("Aggregated balances:", aggregatedBalances);
+
+          // Fetch market prices from Bybit (no CORS issues)
+          console.log("Fetching market prices from Bybit...");
+          const marketResponse = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
+          
+          if (!marketResponse.ok) {
+            throw new Error('Failed to fetch market prices from Bybit');
+          }
+
+          const marketData = await marketResponse.json();
+          console.log('Bybit market data:', marketData);
+
+          // Create price map from Bybit market data
+          const priceMap = {};
+          if (marketData?.result?.list) {
+            marketData.result.list.forEach(ticker => {
+              if (ticker.symbol && ticker.lastPrice) {
+                priceMap[ticker.symbol] = parseFloat(ticker.lastPrice);
+              }
+            });
+          }
+
+          console.log('Price map created:', priceMap);
+
+          // Calculate portfolio with USD values
+          const assets = [];
+          let totalUSD = 0;
+
+          for (const [coin, amount] of Object.entries(aggregatedBalances)) {
+            let price = 0;
+            
+            // Handle stablecoins explicitly
+            if (['USDT', 'USDC', 'PYUSD', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FDUSD'].includes(coin)) {
+              price = 1.0;
+            } else {
+              // Look up price using coin + USDT symbol
+              const tickerSymbol = coin + 'USDT';
+              price = priceMap[tickerSymbol] || 0;
+            }
+            
+            const usdValue = amount * price;
+            
+            if (amount > 0) {
+              totalUSD += usdValue;
+              assets.push({
+                coin,
+                total: amount.toString(),
+                available: amount.toString(),
+                usdValue,
+                price,
+                unrealizedPnL: 0 // Placeholder for now
+              });
+              
+              console.log(`${coin}: ${amount} × $${price} = $${usdValue}`);
+            }
+          }
+
+          const totalILS = totalUSD * ilsRate;
+
+          console.log('Final portfolio calculation:', {
+            totalUSD,
+            totalILS,
+            ilsRate,
+            assetCount: assets.length
+          });
+
+          // Return complete portfolio object
+          return new Response(JSON.stringify({
+            assets,
+            totalUSD,
+            totalILS,
+            ilsRate
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (bybitError) {
+          console.error("Bybit API fetch error:", bybitError);
+          return new Response(JSON.stringify({ 
+            error: bybitError.message || 'Failed to fetch portfolio data from Bybit',
+            details: bybitError.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Unknown action
+      return new Response(JSON.stringify({ error: 'Unknown action' }), {
+        status: 400,
+        headers: corsHeaders
+      });
+
+    } catch (error) {
+      console.error('Worker error:', error);
+      return new Response(JSON.stringify({ 
+        error: error.message || 'Internal server error',
+        details: error.toString()
+      }), {
+        status: 500,
+        headers: corsHeaders
+      });
+    }
   }
 };
+
+// Helper function to generate Bybit signature using Node.js crypto
+function generateBybitSignature(queryString, timestamp, recvWindow, apiKey, apiSecret) {
+  const message = timestamp + apiKey + recvWindow + queryString;
+  return crypto.createHmac('sha256', apiSecret).update(message).digest('hex');
+}

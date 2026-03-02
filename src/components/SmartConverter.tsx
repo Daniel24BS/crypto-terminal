@@ -178,7 +178,7 @@ export default function SmartConverter() {
         let finalToClient = cryptoBought - coin.networkFee
         if (finalToClient < 0) finalToClient = 0
 
-        const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
+        const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
         
         setResult({
           resultLabel: 'נטו ללקוח (אחרי עמלות):',
@@ -202,7 +202,7 @@ export default function SmartConverter() {
         const myProfitILS = calculateFee(budgetNeededILS)
         let totalToPayILS = budgetNeededILS + myProfitILS
 
-        const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
+        const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
 
         setResult({
           resultLabel: 'הלקוח צריך לשלם בסך הכל:',
