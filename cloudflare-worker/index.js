@@ -89,41 +89,89 @@ export default {
           // Keep fallback rate - don't crash
         }
 
-        // Generate Bybit signature
-        const timestamp = Date.now().toString();
-        const recvWindow = '5000';
-        const queryString = 'accountType=UNIFIED';
-        const sign = await generateBybitSignature(queryString, timestamp, recvWindow, apiSecret);
-
-        // Fetch portfolio data from Bybit API
-        let bybitData = null;
+        // Fetch portfolio data from multiple Bybit endpoints
+        let aggregatedBalances = {};
         try {
-          const apiUrl = `https://api.bybit.com/v5/account/wallet-balance?${queryString}`;
-          
-          const bybitResponse = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-              'X-BAPI-API-KEY': apiKey,
-              'X-BAPI-SIGN': sign,
-              'X-BAPI-SIGN-TYPE': '2',
-              'X-BAPI-TIMESTAMP': timestamp,
-              'X-BAPI-RECV-WINDOW': recvWindow,
-              'Content-Type': 'application/json'
+          const timestamp = Date.now().toString();
+          const recvWindow = '5000';
+
+          // Helper function to make authenticated Bybit requests
+          const makeBybitRequest = async (url, queryString) => {
+            const sign = await generateBybitSignature(queryString, timestamp, recvWindow, apiSecret);
+            const fullUrl = `https://api.bybit.com${url}?${queryString}`;
+            
+            console.log(`Fetching from: ${fullUrl}`);
+            
+            const response = await fetch(fullUrl, {
+              method: 'GET',
+              headers: {
+                'X-BAPI-API-KEY': apiKey,
+                'X-BAPI-SIGN': sign,
+                'X-BAPI-SIGN-TYPE': '2',
+                'X-BAPI-TIMESTAMP': timestamp,
+                'X-BAPI-RECV-WINDOW': recvWindow,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`Bybit API error for ${url}:`, errorText);
+              throw new Error(`Bybit API error! status: ${response.status}, response: ${errorText}`);
             }
-          });
 
-          if (!bybitResponse.ok) {
-            const errorText = await bybitResponse.text();
-            console.error("Bybit API error response:", errorText);
-            throw new Error(`Bybit API error! status: ${bybitResponse.status}, response: ${errorText}`);
+            return await response.json();
+          };
+
+          // Make concurrent requests to all endpoints
+          const [unifiedData, spotData, fundData, earnData] = await Promise.allSettled([
+            makeBybitRequest('/v5/account/wallet-balance', 'accountType=UNIFIED'),
+            makeBybitRequest('/v5/account/wallet-balance', 'accountType=SPOT'),
+            makeBybitRequest('/v5/asset/transfer/query-account-coins-balance', 'accountType=FUND'),
+            makeBybitRequest('/v5/earn/position', 'category=FlexibleSaving')
+          ]);
+
+          // Process UNIFIED account balances
+          if (unifiedData.status === 'fulfilled' && unifiedData.value?.result?.list?.[0]?.coin) {
+            unifiedData.value.result.list[0].coin.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
           }
 
-          bybitData = await bybitResponse.json();
-          console.log("Bybit API response:", bybitData);
-
-          if (!bybitData?.result?.list || bybitData.result.list.length === 0) {
-            throw new Error('No portfolio data found in Bybit response');
+          // Process SPOT account balances
+          if (spotData.status === 'fulfilled' && spotData.value?.result?.list?.[0]?.coin) {
+            spotData.value.result.list[0].coin.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
           }
+
+          // Process FUND account balances
+          if (fundData.status === 'fulfilled' && fundData.value?.result?.coins) {
+            fundData.value.result.coins.forEach(coin => {
+              const amount = parseFloat(coin.walletBalance) || 0;
+              if (amount > 0) {
+                aggregatedBalances[coin.coin] = (aggregatedBalances[coin.coin] || 0) + amount;
+              }
+            });
+          }
+
+          // Process EARN (Flexible Savings) balances
+          if (earnData.status === 'fulfilled' && earnData.value?.result?.list) {
+            earnData.value.result.list.forEach(position => {
+              const amount = parseFloat(position.amount) || 0;
+              if (amount > 0) {
+                aggregatedBalances[position.coin] = (aggregatedBalances[position.coin] || 0) + amount;
+              }
+            });
+          }
+
+          console.log("Aggregated balances:", aggregatedBalances);
 
         } catch (bybitError) {
           console.error("Bybit API fetch error:", bybitError);
@@ -136,9 +184,9 @@ export default {
           });
         }
 
-        // Return both portfolio data and ILS rate in structured response
+        // Return aggregated balances and ILS rate in structured response
         return new Response(JSON.stringify({
-          balances: bybitData,
+          balances: aggregatedBalances,
           ilsRate
         }), {
           status: 200,
