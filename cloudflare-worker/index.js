@@ -222,6 +222,17 @@ export default {
             }
           }
 
+          // Add test asset for debugging
+          assets.push({
+            coin: "TEST",
+            total: "1",
+            available: "1", 
+            usdValue: 100,
+            price: 100,
+            unrealizedPnL: 0
+          });
+          totalUSD += 100;
+
           const totalILS = totalUSD * ilsRate;
 
           console.log('Final portfolio calculation:', {
