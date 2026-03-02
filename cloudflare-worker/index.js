@@ -183,12 +183,17 @@ async function generateBybitSignature(queryString, timestamp, recvWindow, apiSec
   const key = await crypto.subtle.importKey(
     'raw',
     keyData,
-    { name: 'HMAC', hash: 'SHA256' },
+    { name: 'HMAC', hash: { name: 'SHA-256' } },
     false,
     ['sign']
   );
 
-  const signature = await crypto.subtle.sign('HMAC', key, messageData);
+  const signature = await crypto.subtle.sign(
+    { name: 'HMAC', hash: { name: 'SHA-256' } },
+    key,
+    messageData
+  );
+  
   const signatureArray = Array.from(new Uint8Array(signature));
   const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
   
