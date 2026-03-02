@@ -44,11 +44,18 @@ export default function SmartConverter() {
   const [usdValue, setUsdValue] = useState('')
   const [cryptoValue, setCryptoValue] = useState('')
   const [selectedCoin, setSelectedCoin] = useState('solana')
-  const [baseExchangeRate, setBaseExchangeRate] = useState(3.65)
+  const [baseExchangeRate, setBaseExchangeRate] = useState(balances?.usdToIlsRate || 3.65)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ConversionResult | null>(null)
 
   const bybitFiatFee = 0.02
+
+  // Update exchange rate when portfolio data changes
+  useEffect(() => {
+    if (balances?.usdToIlsRate) {
+      setBaseExchangeRate(balances.usdToIlsRate)
+    }
+  }, [balances?.usdToIlsRate])
 
   // New fee calculation rules
   const calculateFee = (amountILS: number): number => {
@@ -56,41 +63,6 @@ export default function SmartConverter() {
       return amountILS * 0.10; // 10% for transactions > 200 ILS
     } else {
       return 15; // Fixed 15 ILS for transactions <= 200 ILS
-    }
-  }
-
-  useEffect(() => {
-    initRate()
-  }, [])
-
-  const initRate = async () => {
-    try {
-      // Get ILS rate from our Cloudflare Worker API
-      console.log("Fetching ILS rate from Cloudflare Worker...")
-      const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'action': 'get_ils'
-        },
-        body: JSON.stringify({ action: 'get_ils' })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data?.ilsRate) {
-          setBaseExchangeRate(data.ilsRate)
-          console.log("SUCCESS: ILS rate from Cloudflare Worker:", data.ilsRate)
-          return
-        }
-      }
-      
-      throw new Error('No ILS rate in server response')
-    } catch (e) {
-      console.error('Failed to fetch ILS rate from Cloudflare Worker:', e)
-      // FALLBACK: Set a reasonable default rate so app doesn't crash
-      console.log('Using fallback ILS rate: 3.65')
-      setBaseExchangeRate(3.65)
     }
   }
 
@@ -154,68 +126,63 @@ export default function SmartConverter() {
 
       console.log(`Using portfolio price for ${symbol}: $${rateUSD} (₪${rateILS.toFixed(2)})`)
 
-      try {
-        if (!isInverse) {
-          // Fiat to Crypto mode
-          const myProfitILS = calculateFee(inputILS)
+      if (!isInverse) {
+        // Fiat to Crypto mode
+        const myProfitILS = calculateFee(inputILS)
 
-          if (inputILS <= myProfitILS) {
-            setLoading(false)
-            alert('הסכום נמוך מדי לעסקה (מכסה רק את עמלת השירות שלך)')
-            return
-          }
-
-          let buyBudgetILS = inputILS - myProfitILS
-          let cryptoBought = (buyBudgetILS * (1 - bybitFiatFee)) / rateILS
-          let finalToClient = cryptoBought - coin.networkFee
-          if (finalToClient < 0) finalToClient = 0
-
-          const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
-          
-          setResult({
-            resultLabel: 'נטו ללקוח (אחרי עמלות):',
-            finalResult: `${finalToClient.toFixed(5)} ${symbol}`,
-            amountToBuy: `${cryptoBought.toFixed(5)} ${symbol}`,
-            breakdown: `
-              <strong>פירוט עסקה מלא:</strong><br/>
-              • הלקוח שילם: ${formatFiat(inputILS, rateUSD / rateILS)}<br/>
-              • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
-              • תקציב קנייה (נטו): ${formatFiat(buyBudgetILS, rateUSD / rateILS)}<br/>
-              • עמלת רשת: ${coin.networkFee} ${symbol}<br/>
-              • עמלת Bybit: 2%<br/>
-            `
-          })
-
-        } else {
-          // Crypto to Fiat mode (inverse)
-          let cryptoToBuy = inputCrypto + coin.networkFee
-          let budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
-          
-          const myProfitILS = calculateFee(budgetNeededILS)
-          let totalToPayILS = budgetNeededILS + myProfitILS
-
-          const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
-
-          setResult({
-            resultLabel: 'הלקוח צריך לשלם בסך הכל:',
-            finalResult: formatFiat(totalToPayILS, rateUSD / rateILS),
-            amountToBuy: `${cryptoToBuy.toFixed(5)} ${symbol}`,
-            breakdown: `
-              <strong>פירוט עסקה (חישוב הפוך):</strong><br/>
-              • הלקוח יקבל: ${inputCrypto} ${symbol}<br/>
-              • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
-              • שער המטבע: 1 ${symbol} = ${rateILS.toFixed(2)} ₪ / $${rateUSD.toFixed(2)}<br/>
-              • עמלת Bybit: 2%<br/>
-            `
-          })
+        if (inputILS <= myProfitILS) {
+          setLoading(false)
+          alert('הסכום נמוך מדי לעסקה (מכסה רק את עמלת השירות שלך)')
+          return
         }
-      } catch (e) {
-        console.error('Calculation error:', e)
-        alert('שגיאה בחישוב - בדוק נתונים')
+
+        let buyBudgetILS = inputILS - myProfitILS
+        let cryptoBought = (buyBudgetILS * (1 - bybitFiatFee)) / rateILS
+        let finalToClient = cryptoBought - coin.networkFee
+        if (finalToClient < 0) finalToClient = 0
+
+        const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
+        
+        setResult({
+          resultLabel: 'נטו ללקוח (אחרי עמלות):',
+          finalResult: `${finalToClient.toFixed(5)} ${symbol}`,
+          amountToBuy: `${cryptoBought.toFixed(5)} ${symbol}`,
+          breakdown: `
+            <strong>פירוט עסקה מלא:</strong><br/>
+            • הלקוח שילם: ${formatFiat(inputILS, rateUSD / rateILS)}<br/>
+            • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
+            • תקציב קנייה (נטו): ${formatFiat(buyBudgetILS, rateUSD / rateILS)}<br/>
+            • עמלת רשת: ${coin.networkFee} ${symbol}<br/>
+            • עמלת Bybit: 2%<br/>
+          `
+        })
+
+      } else {
+        // Crypto to Fiat mode (inverse)
+        let cryptoToBuy = inputCrypto + coin.networkFee
+        let budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
+        
+        const myProfitILS = calculateFee(budgetNeededILS)
+        let totalToPayILS = budgetNeededILS + myProfitILS
+
+        const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 15₪'
+
+        setResult({
+          resultLabel: 'הלקוח צריך לשלם בסך הכל:',
+          finalResult: formatFiat(totalToPayILS, rateUSD / rateILS),
+          amountToBuy: `${cryptoToBuy.toFixed(5)} ${symbol}`,
+          breakdown: `
+            <strong>פירוט עסקה (חישוב הפוך):</strong><br/>
+            • הלקוח יקבל: ${inputCrypto} ${symbol}<br/>
+            • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
+            • שער המטבע: 1 ${symbol} = ${rateILS.toFixed(2)} ₪ / $${rateUSD.toFixed(2)}<br/>
+            • עמלת Bybit: 2%<br/>
+          `
+        })
       }
     } catch (e) {
       console.error('Calculation error:', e)
-      alert('שגיאה במשיכת שערים - בדוק חיבור אינטרנט')
+      alert('שגיאה בחישוב - בדוק נתונים')
     } finally {
       setLoading(false)
     }
