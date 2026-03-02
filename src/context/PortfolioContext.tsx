@@ -163,6 +163,7 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
 
       const data = await response.json()
       console.log("Portfolio data from Cloudflare Worker:", data)
+      console.log('Portfolio data parsed:', JSON.stringify(data.balances, null, 2))
 
       if (data?.balances && typeof data.balances === 'object') {
         // Parse new aggregated structure: { balances: { "BTC": 0.5, "SOL": 12.3 } }
@@ -174,6 +175,8 @@ export const PortfolioProvider = ({ children }: { children: ReactNode }) => {
             available: amount.toString(),
             usdValue: 0 // Will be calculated below
           }));
+
+        console.log('Aggregated balances array:', aggregatedBalances);
 
         // Fetch current prices for USD value calculation
         const totalUSD = await calculateTotalUSDValue(data.balances as Record<string, string>);
