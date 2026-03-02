@@ -16,15 +16,24 @@ interface ConversionResult {
 }
 
 const coins: Coin[] = [
-  { id: 'xrp', symbol: 'XRP', name: 'Ripple', networkFee: 0.2 },
-  { id: 'solana', symbol: 'SOL', name: 'Solana', networkFee: 0.008 },
-  { id: 'litecoin', symbol: 'LTC', name: 'Litecoin', networkFee: 0.001 },
-  { id: 'pepe', symbol: 'PEPE', name: 'Pepe', networkFee: 500000 },
-  { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu', networkFee: 100000 },
-  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', networkFee: 5.0 },
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', networkFee: 0.0002 },
   { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', networkFee: 0.0012 },
-  { id: 'cardano', symbol: 'ADA', name: 'Cardano', networkFee: 0.17 }
+  { id: 'solana', symbol: 'SOL', name: 'Solana', networkFee: 0.008 },
+  { id: 'xrp', symbol: 'XRP', name: 'Ripple', networkFee: 0.2 },
+  { id: 'litecoin', symbol: 'LTC', name: 'Litecoin', networkFee: 0.001 },
+  { id: 'cardano', symbol: 'ADA', name: 'Cardano', networkFee: 0.17 },
+  { id: 'avalanche', symbol: 'AVAX', name: 'Avalanche', networkFee: 0.001 },
+  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', networkFee: 5.0 },
+  { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu', networkFee: 100000 },
+  { id: 'pepe', symbol: 'PEPE', name: 'Pepe', networkFee: 500000 },
+  { id: 'polkadot', symbol: 'DOT', name: 'Polkadot', networkFee: 0.1 },
+  { id: 'chainlink', symbol: 'LINK', name: 'Chainlink', networkFee: 0.01 },
+  { id: 'near', symbol: 'NEAR', name: 'NEAR Protocol', networkFee: 0.025 },
+  { id: 'bitcoin-cash', symbol: 'BCH', name: 'Bitcoin Cash', networkFee: 0.0001 },
+  { id: 'fetch', symbol: 'FET', name: 'Fetch.ai', networkFee: 0.1 },
+  { id: 'injective', symbol: 'INJ', name: 'Injective', networkFee: 0.01 },
+  { id: 'kaspa', symbol: 'KAS', name: 'Kaspa', networkFee: 0.1 },
+  { id: 'toncoin', symbol: 'TON', name: 'Toncoin', networkFee: 0.05 }
 ]
 
 export default function SmartConverter() {

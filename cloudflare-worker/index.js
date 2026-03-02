@@ -76,47 +76,41 @@ export default {
           }
 
           coin = coin.toUpperCase();
-          
-          // Format symbol (uppercase + USDT suffix)
-          let symbol = coin.endsWith('USDT') ? coin : `${coin}USDT`;
-          
-          console.log(`Fetching ticker for: ${symbol}`);
+          console.log(`Searching for ticker for: ${coin}`);
 
-          // Fetch single ticker from Bybit public API
-          let response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${symbol}`);
+          // Fetch ALL spot tickers at once (bulletproof approach)
+          const response = await fetch('https://api.bybit.com/v5/market/tickers?category=spot');
           
           if (!response.ok) {
-            // Try memecoin 1000 prefix for low-priced coins
-            if (!coin.startsWith('1000') && (coin === 'PEPE' || coin === 'SHIB')) {
-              const memecoinSymbol = `1000${coin}USDT`;
-              console.log(`Trying memecoin prefix: ${memecoinSymbol}`);
-              response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${memecoinSymbol}`);
-              symbol = memecoinSymbol;
-            }
-          }
-
-          if (!response.ok) {
-            throw new Error(`Failed to fetch ticker for ${symbol}`);
+            throw new Error('Failed to fetch spot tickers');
           }
 
           const data = await response.json();
-          console.log('Bybit ticker data:', data);
+          console.log('Bybit tickers data received');
+
+          // Intelligent symbol search with multiple variations
+          const target1 = `${coin}USDT`;
+          const target2 = `1000${coin}USDT`;
+          const target3 = coin; // In case coin already includes USDT
           
-          // Extract price from response
-          let price = 0;
-          if (data?.result?.list?.[0]?.lastPrice) {
-            price = parseFloat(data.result.list[0].lastPrice);
+          // Search for matching ticker
+          const ticker = data?.result?.list?.find(t => 
+            t.symbol === target1 || 
+            t.symbol === target2 || 
+            t.symbol === target3 ||
+            t.symbol === coin
+          );
+
+          if (!ticker || !ticker.lastPrice) {
+            throw new Error(`Ticker not found for ${coin} (tried: ${target1}, ${target2}, ${target3})`);
           }
 
-          if (price === 0) {
-            throw new Error(`Price not available for ${symbol}`);
-          }
-
-          console.log(`Ticker price for ${symbol}: $${price}`);
+          const price = parseFloat(ticker.lastPrice);
+          console.log(`Found ticker ${ticker.symbol}: $${price}`);
 
           return new Response(JSON.stringify({ 
             coin,
-            symbol,
+            symbol: ticker.symbol,
             price
           }), {
             status: 200,
