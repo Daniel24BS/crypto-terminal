@@ -259,9 +259,12 @@ export default {
 
         } catch (bybitError) {
           console.error("Bybit API fetch error:", bybitError);
+          debugInfo.fatalWorkerError = bybitError.message || bybitError.toString();
+          debugInfo.stack = bybitError.stack;
           return new Response(JSON.stringify({ 
-            error: bybitError.message || 'Failed to fetch portfolio data from Bybit',
-            details: bybitError.toString()
+            balances: {},
+            ilsRate: 3.65,
+            debugInfo
           }), {
             status: 500,
             headers: corsHeaders
@@ -303,32 +306,63 @@ export default {
 
 // Helper function to generate Bybit signature
 async function generateBybitSignature(queryString, timestamp, recvWindow, apiSecret) {
-  const crypto = globalThis.crypto || (globalThis.webcrypto && globalThis.webcrypto.subtle);
-  if (!crypto) {
-    throw new Error('Crypto API not available in this environment');
+  try {
+    const crypto = globalThis.crypto || (globalThis.webcrypto && globalThis.webcrypto.subtle);
+    if (!crypto) {
+      throw new Error('Crypto API not available in this environment');
+    }
+
+    const message = timestamp + recvWindow + queryString;
+    console.log('Signature generation debug:', {
+      timestamp,
+      recvWindow,
+      queryString,
+      message,
+      apiSecretLength: apiSecret.length
+    });
+
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(apiSecret);
+    const messageData = encoder.encode(message);
+
+    console.log('Encoded data debug:', {
+      keyDataType: keyData.constructor.name,
+      messageDataType: messageData.constructor.name,
+      keyDataLength: keyData.length,
+      messageDataLength: messageData.length
+    });
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: { name: 'SHA-256' } },
+      false,
+      ['sign']
+    );
+
+    console.log('Key import successful');
+
+    const signature = await crypto.subtle.sign(
+      { name: 'HMAC', hash: { name: 'SHA-256' } },
+      key,
+      messageData
+    );
+    
+    console.log('Signature generation successful, signature type:', signature.constructor.name);
+
+    const signatureArray = Array.from(new Uint8Array(signature));
+    const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    console.log('Final signature hex length:', signatureHex.length);
+    
+    return signatureHex;
+  } catch (error) {
+    console.error('Signature generation failed:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    throw error;
   }
-
-  const message = timestamp + recvWindow + queryString;
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(apiSecret);
-  const messageData = encoder.encode(message);
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: { name: 'SHA-256' } },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign(
-    { name: 'HMAC', hash: { name: 'SHA-256' } },
-    key,
-    messageData
-  );
-  
-  const signatureArray = Array.from(new Uint8Array(signature));
-  const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  
-  return signatureHex;
 }
