@@ -85,6 +85,17 @@ export default function SmartConverter() {
     }
   }, [balances?.usdToIlsRate])
 
+  // Auto-refresh USD/ILS exchange rate every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (balances?.usdToIlsRate) {
+        setBaseExchangeRate(balances.usdToIlsRate)
+      }
+    }, 60000) // 60 seconds
+
+    return () => clearInterval(interval)
+  }, [balances?.usdToIlsRate])
+
   // New fee calculation rules (updated)
   const calculateFee = (amountILS: number): number => {
     if (amountILS > 200) {
@@ -472,7 +483,7 @@ export default function SmartConverter() {
         setGeminiMessages(prev => [...prev, aiMessage])
       } else {
         const errorData = await response.json()
-        console.error("Worker Error Details:", errorData)
+        console.error("Worker Error Details:", JSON.stringify(errorData, null, 2))
         throw new Error(`Server Error: ${response.status} - ${errorData.error || 'Unknown error'}`)
       }
     } catch (error: any) {
