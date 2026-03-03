@@ -438,7 +438,7 @@ export default function SmartConverter() {
   }
 
   const sendGeminiMessage = async () => {
-    if (!geminiInput.trim()) return
+    if (!geminiInput.trim() || isGeminiLoading) return
 
     const userMessage: GeminiMessage = {
       id: Date.now().toString(),
@@ -471,12 +471,12 @@ export default function SmartConverter() {
         }
         setGeminiMessages(prev => [...prev, aiMessage])
       } else {
-        const errorText = await response.text()
-        console.error("Raw Gemini Error:", errorText)
-        throw new Error(`Server Error: ${response.status} - ${errorText}`)
+        const errorData = await response.json()
+        console.error("Worker Error Details:", errorData)
+        throw new Error(`Server Error: ${response.status} - ${errorData.error || 'Unknown error'}`)
       }
     } catch (error: any) {
-      console.error('Gemini error:', error)
+      console.error('Gemini fetch error:', error)
       const errorMessage: GeminiMessage = {
         id: (Date.now() + 1).toString(),
         text: `שגיאה בתקשורת: ${error.message}`,

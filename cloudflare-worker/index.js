@@ -280,24 +280,42 @@ export default {
           });
 
           if (!geminiResponse.ok) {
-            const errorText = await geminiResponse.text();
-            console.error("Gemini API error:", errorText);
+            let errorDetails;
+            try {
+              errorDetails = await geminiResponse.json();
+            } catch (e) {
+              errorDetails = await geminiResponse.text();
+            }
+            console.error("Gemini API error:", errorDetails);
             return new Response(JSON.stringify({ 
               error: "Google API Error", 
-              details: errorText 
+              details: errorDetails 
             }), {
               status: 500,
               headers: corsHeaders
             });
           }
 
-          const geminiData = await geminiResponse.json();
-          const aiResponse = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || 'לא התקבלה תשובה מ-Gemini.';
+          let geminiData;
+          try {
+            geminiData = await geminiResponse.json();
+          } catch (e) {
+            console.error("Failed to parse Gemini response:", e);
+            return new Response(JSON.stringify({ 
+              error: "Invalid JSON Response", 
+              details: e.toString()
+            }), {
+              status: 500,
+              headers: corsHeaders
+            });
+          }
+
+          const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "No text returned.";
 
           console.log("Gemini response received");
           
           return new Response(JSON.stringify({ 
-            response: aiResponse,
+            response: text,
             timestamp: new Date().toISOString()
           }), {
             status: 200,
