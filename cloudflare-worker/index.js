@@ -271,7 +271,7 @@ export default {
 
           console.log("Sending request to Gemini API");
           
-          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyAx4LGE8hjb1IbFkLXJfstH-eA7a-EvF_E`, {
+          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyAx4LGE8hjb1IbFkLXJfstH-eA7a-EvF_E`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -310,8 +310,7 @@ export default {
         } catch (error) {
           console.error("ASK_GEMINI error:", error);
           return new Response(JSON.stringify({ 
-            error: error.message || 'Failed to process AI request',
-            details: error.toString()
+            error: error.message || "Unknown Worker Error"
           }), {
             status: 500,
             headers: corsHeaders

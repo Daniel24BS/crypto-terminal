@@ -471,13 +471,15 @@ export default function SmartConverter() {
         }
         setGeminiMessages(prev => [...prev, aiMessage])
       } else {
-        throw new Error('Failed to get AI response')
+        const errorText = await response.text()
+        console.error("Raw Gemini Error:", errorText)
+        throw new Error(`Server Error: ${response.status} - ${errorText}`)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Gemini error:', error)
       const errorMessage: GeminiMessage = {
         id: (Date.now() + 1).toString(),
-        text: 'שגיאה בתקשורת עם השרת. נסה לנסות שוב.',
+        text: `שגיאה בתקשורת: ${error.message}`,
         sender: 'ai',
         timestamp: new Date().toISOString()
       }
