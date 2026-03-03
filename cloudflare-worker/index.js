@@ -271,7 +271,7 @@ export default {
 
           console.log("Sending request to Gemini API");
           
-          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyAx4LGE8hjb1IbFkLXJfstH-eA7a-EvF_E`, {
+          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyAx4LGE8hjb1IbFkLXJfstH-eA7a-EvF_E`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -282,11 +282,17 @@ export default {
           if (!geminiResponse.ok) {
             const errorText = await geminiResponse.text();
             console.error("Gemini API error:", errorText);
-            throw new Error(`Gemini API failed: ${geminiResponse.status} ${errorText}`);
+            return new Response(JSON.stringify({ 
+              error: "Google API Error", 
+              details: errorText 
+            }), {
+              status: 500,
+              headers: corsHeaders
+            });
           }
 
           const geminiData = await geminiResponse.json();
-          const aiResponse = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+          const aiResponse = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || 'לא התקבלה תשובה מ-Gemini.';
 
           console.log("Gemini response received");
           

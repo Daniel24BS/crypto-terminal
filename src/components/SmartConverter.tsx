@@ -74,7 +74,7 @@ export default function SmartConverter() {
   const [geminiInput, setGeminiInput] = useState('')
   const [isGeminiOpen, setIsGeminiOpen] = useState(false)
   const [isGeminiLoading, setIsGeminiLoading] = useState(false)
-  const [currentPrice, setCurrentPrice] = useState(0)
+  const [rateUSD, setRateUSD] = useState(0)
 
   const bybitFiatFee = 0.02
 
@@ -173,7 +173,7 @@ export default function SmartConverter() {
             rateUSD = tickerData.price || 0
             setDecimalsAllowed(tickerData.decimalsAllowed || 8)
             setSpreadPercent(tickerData.spreadPercent || 0)
-            setCurrentPrice(rateUSD)
+            setRateUSD(rateUSD)
             console.log(`Fetched ticker price for ${symbol}: $${rateUSD}, decimals: ${tickerData.decimalsAllowed}, spread: ${tickerData.spreadPercent}%`)
           } else {
             const errorText = await tickerResponse.text()
@@ -488,6 +488,41 @@ export default function SmartConverter() {
     }
   }
 
+  // WhatsApp Receipt Function
+  const sendWhatsAppReceipt = () => {
+    if (!result) return
+    
+    const coin = coins.find(c => c.id === selectedCoin)
+    if (!coin) return
+    
+    const inputILS = parseFloat(ilsValue) || parseFloat(usdValue) * baseExchangeRate
+    const fee = calculateFee(inputILS)
+    const feeType = inputILS > 200 ? '10%' : '10₪ קבועה'
+    
+    // Extract crypto amount from result
+    const cryptoMatch = result.finalResult.match(/([\d.]+)\s+(\w+)/)
+    const cryptoAmount = cryptoMatch ? parseFloat(cryptoMatch[1]) : 0
+    const cryptoSymbol = cryptoMatch ? cryptoMatch[2] : coin.symbol
+    
+    // Build professional Hebrew message
+    const message = `שלום! 🤝 עסקת המרה בוצעה בהצלחה
+
+📊 פרטי העסקה:
+• סכום ששולם: ₪${inputILS.toFixed(2)}
+• מטבע שהתקבל: ${cryptoAmount.toFixed(6)} ${cryptoSymbol}
+• שער דולר: $${rateUSD.toFixed(2)}
+• עמלת שירות: ₪${fee.toFixed(2)} (${feeType})
+• תנודתיות: ${volatility.toFixed(1)}%
+• פער מחירים: ${spreadPercent.toFixed(2)}%
+
+🎯 סטטוס: העסקה הושלמה בהצלחה!
+תודה שבחרת בשירות שלנו! 🚀`
+
+    // Open WhatsApp with pre-filled message
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
+    window.open(whatsappUrl, '_blank')
+  }
+
   return (
     <div className="bg-gray-900 rounded-xl p-6 shadow-xl">
       <div className="flex justify-between items-center mb-6">
@@ -643,6 +678,13 @@ export default function SmartConverter() {
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
           >
             💾 שמור עסקה
+          </button>
+
+          <button
+            onClick={sendWhatsAppReceipt}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+          >
+            📱 שלח קבלה בוואטסאפ
           </button>
         </div>
       )}
