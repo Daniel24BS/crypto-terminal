@@ -229,6 +229,90 @@ export default {
         }
       }
 
+      // ROUTE: Get transactions from KV storage
+      if (action === 'GET_TXS') {
+        try {
+          console.log("Fetching transactions from KV");
+          
+          const history = await env.TRANSACTIONS.get('history', 'json') || [];
+          
+          return new Response(JSON.stringify({ 
+            history: history,
+            count: history.length
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("GET_TXS error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to fetch transactions',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // ROUTE: Save transaction to KV storage
+      if (action === 'SAVE_TX') {
+        try {
+          console.log("Saving transaction to KV");
+          
+          const transaction = body.transaction;
+          
+          if (!transaction) {
+            return new Response(JSON.stringify({ error: 'No transaction provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Fetch existing history
+          let history = await env.TRANSACTIONS.get('history', 'json') || [];
+          
+          // Add new transaction to the beginning
+          history.unshift(transaction);
+          
+          // Keep only the last 50 transactions
+          if (history.length > 50) {
+            history = history.slice(0, 50);
+          }
+          
+          // Save back to KV
+          await env.TRANSACTIONS.put('history', JSON.stringify(history));
+          
+          console.log(`Transaction saved. Total count: ${history.length}`);
+          
+          return new Response(JSON.stringify({ 
+            success: true,
+            history: history,
+            count: history.length
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("SAVE_TX error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to save transaction',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // ROUTE: Get coin prices from Bybit (public endpoint, no API keys required)
       if (action === 'fetch_price' || action === 'get_market_price') {
         try {

@@ -64,6 +64,7 @@ export default function SmartConverter() {
   const [spreadPercent, setSpreadPercent] = useState(0)
   const [volatility, setVolatility] = useState(0)
   const [rateUSD, setRateUSD] = useState(0)
+  const [isRefreshingRate, setIsRefreshingRate] = useState(false)
 
   const bybitFiatFee = 0.02
 
@@ -84,6 +85,34 @@ export default function SmartConverter() {
 
     return () => clearInterval(interval)
   }, [balances?.usdToIlsRate])
+
+  // Fetch transactions from KV storage on component mount
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'GET_TXS' })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          setHistory(data.history || [])
+          console.log('Fetched transactions from KV:', data.count)
+        }
+      } catch (error) {
+        console.error('Failed to fetch transactions from KV:', error)
+        // Fallback to localStorage if KV fails
+        const saved = localStorage.getItem('tx_history')
+        if (saved) {
+          setHistory(JSON.parse(saved))
+        }
+      }
+    }
+
+    fetchTransactions()
+  }, [])
 
   // New fee calculation rules (updated)
   const calculateFee = (amountILS: number): number => {
@@ -294,7 +323,7 @@ export default function SmartConverter() {
     setCryptoValue('')
   }
 
-  const saveTransaction = () => {
+  const saveTransaction = async () => {
     if (!result) return
     
     const coin = coins.find(c => c.id === selectedCoin)
@@ -318,9 +347,31 @@ export default function SmartConverter() {
       fee
     }
     
-    const newHistory = [transaction, ...history].slice(0, 10) // Keep last 10
-    setHistory(newHistory)
-    localStorage.setItem('tx_history', JSON.stringify(newHistory))
+    try {
+      // Save to KV storage
+      const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_TX',
+          transaction: transaction
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setHistory(data.history || [])
+        console.log('Transaction saved to KV:', data.count)
+      } else {
+        throw new Error('Failed to save to KV')
+      }
+    } catch (error) {
+      console.error('Failed to save transaction to KV, falling back to localStorage:', error)
+      // Fallback to localStorage
+      const newHistory = [transaction, ...history].slice(0, 10)
+      setHistory(newHistory)
+      localStorage.setItem('tx_history', JSON.stringify(newHistory))
+    }
   }
 
   // Auto-refresh price every 30 seconds
@@ -455,6 +506,30 @@ export default function SmartConverter() {
     window.open(whatsappUrl, '_blank')
   }
 
+  // Force refresh USD/ILS rate
+  const forceRefreshUSD = async () => {
+    setIsRefreshingRate(true)
+    
+    try {
+      // Fetch fresh USD/ILS rate from CoinGecko
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=ils')
+      if (response.ok) {
+        const data = await response.json()
+        const newRate = data.usd.ils
+        if (newRate && newRate > 0) {
+          setBaseExchangeRate(newRate)
+          console.log('USD/ILS rate force-refreshed:', newRate)
+        }
+      } else {
+        console.error('Failed to fetch fresh USD/ILS rate')
+      }
+    } catch (error) {
+      console.error('Error force-refreshing USD/ILS rate:', error)
+    } finally {
+      setIsRefreshingRate(false)
+    }
+  }
+
   return (
     <div className="bg-gray-900 rounded-xl p-6 shadow-xl">
       <div className="flex justify-between items-center mb-4">
@@ -467,10 +542,19 @@ export default function SmartConverter() {
       {/* Live USD Rate Display */}
       <div className="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-400">🇺🇸 שער דולר רציף:</span>
-          <span className="text-lg font-bold text-green-400">
-            ₪{baseExchangeRate.toFixed(2)}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400">🇺🇸 שער דולר רציף:</span>
+            <span className="text-lg font-bold text-green-400">
+              ₪{baseExchangeRate.toFixed(2)}
+            </span>
+          </div>
+          <button
+            onClick={forceRefreshUSD}
+            disabled={isRefreshingRate}
+            className="text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-3 py-1 rounded transition-colors"
+          >
+            {isRefreshingRate ? '⏳ טוען...' : '🔄 רענן שער מט"ח'}
+          </button>
         </div>
         <div className="text-xs text-gray-500 mt-1">מתעדכן אוטומטית כל 60 שניות</div>
       </div>

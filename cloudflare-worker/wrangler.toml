@@ -8,3 +8,7 @@ vars = [
   { binding = "BYBIT_API_KEY", type = "secret" },
   { binding = "BYBIT_API_SECRET", type = "secret" }
 ]
+
+[[kv_namespaces]]
+binding = "TRANSACTIONS"
+id = "d755b2f4b5dd439785cf3732d444be69"
