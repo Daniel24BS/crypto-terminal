@@ -107,10 +107,46 @@ export default {
           const price = parseFloat(ticker.lastPrice);
           console.log(`Found ticker ${ticker.symbol}: $${price}`);
 
+          // Fetch instruments info for lot size precision
+          let decimalsAllowed = 8; // default fallback
+          let spreadPercent = 0; // slippage percentage
+          try {
+            // Parallel fetch for instruments and orderbook
+            const [instrumentsResponse, orderbookResponse] = await Promise.all([
+              fetch(`https://api.bybit.com/v5/market/instruments-info?category=spot&symbol=${ticker.symbol}`),
+              fetch(`https://api.bybit.com/v5/market/orderbook?category=spot&symbol=${ticker.symbol}&limit=50`)
+            ]);
+
+            // Handle instruments info
+            if (instrumentsResponse.ok) {
+              const instrumentsData = await instrumentsResponse.json();
+              if (instrumentsData?.result?.list?.[0]?.lotSizeFilter?.basePrecision) {
+                decimalsAllowed = instrumentsData.result.list[0].lotSizeFilter.basePrecision;
+                console.log(`Lot size precision for ${ticker.symbol}: ${decimalsAllowed} decimals`);
+              }
+            }
+
+            // Handle orderbook for slippage
+            if (orderbookResponse.ok) {
+              const orderbookData = await orderbookResponse.json();
+              const ask1 = orderbookData?.result?.a?.[0]?.[0]; // lowest ask
+              const bid1 = orderbookData?.result?.b?.[0]?.[0]; // highest bid
+              
+              if (ask1 && bid1 && bid1 > 0) {
+                spreadPercent = ((ask1 - bid1) / bid1) * 100;
+                console.log(`Market depth for ${ticker.symbol}: bid=${bid1}, ask=${ask1}, spread=${spreadPercent}%`);
+              }
+            }
+          } catch (error) {
+            console.log("Failed to fetch market data:", error);
+          }
+
           return new Response(JSON.stringify({ 
             coin,
             symbol: ticker.symbol,
-            price
+            price,
+            decimalsAllowed,
+            spreadPercent
           }), {
             status: 200,
             headers: {

@@ -60,6 +60,9 @@ export default function SmartConverter() {
     return saved ? JSON.parse(saved) : []
   })
   const [klineData, setKlineData] = useState<number[]>([])
+  const [decimalsAllowed, setDecimalsAllowed] = useState(8)
+  const [spreadPercent, setSpreadPercent] = useState(0)
+  const [volatility, setVolatility] = useState(0)
 
   const bybitFiatFee = 0.02
 
@@ -156,7 +159,9 @@ export default function SmartConverter() {
             const tickerData = await tickerResponse.json()
             console.log("Worker response data:", tickerData)
             rateUSD = tickerData.price || 0
-            console.log(`Fetched ticker price for ${symbol}: $${rateUSD}`)
+            setDecimalsAllowed(tickerData.decimalsAllowed || 8)
+            setSpreadPercent(tickerData.spreadPercent || 0)
+            console.log(`Fetched ticker price for ${symbol}: $${rateUSD}, decimals: ${tickerData.decimalsAllowed}, spread: ${tickerData.spreadPercent}%`)
           } else {
             const errorText = await tickerResponse.text()
             console.error(`Failed to fetch ticker for ${symbol}. Status: ${tickerResponse.status}, Error: ${errorText}`)
@@ -175,6 +180,18 @@ export default function SmartConverter() {
 
       const rateILS = rateUSD * baseExchangeRate
       console.log(`Final price for ${symbol}: $${rateUSD} (₪${rateILS.toFixed(2)})`)
+      
+      // Calculate volatility from kline data
+      let calculatedVolatility = 0
+      if (klineData.length >= 2) {
+        const maxPrice = Math.max(...klineData)
+        const minPrice = Math.min(...klineData)
+        calculatedVolatility = ((maxPrice - minPrice) / minPrice) * 100
+        console.log(`Volatility for ${symbol}: ${calculatedVolatility.toFixed(1)}% (max: $${maxPrice}, min: $${minPrice})`)
+      }
+      
+      // Update volatility state for UI
+      setVolatility(calculatedVolatility)
 
       if (!isInverse) {
         // Fiat to Crypto mode
@@ -191,12 +208,20 @@ export default function SmartConverter() {
         let finalToClient = cryptoBought - coin.networkFee
         if (finalToClient < 0) finalToClient = 0
 
+        // Apply lot size rounding (Feature 12)
+        const roundingFactor = Math.pow(10, decimalsAllowed)
+        finalToClient = Math.floor(finalToClient * roundingFactor) / roundingFactor
+
         const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
+        
+        // Check for slippage warning (Feature 1)
+        const slippageWarning = spreadPercent > 0.5 ? 
+          '⚠️ אזהרת נזילות: פער מחירים (Spread) גבוה' : ''
         
         setResult({
           resultLabel: 'נטו ללקוח (אחרי עמלות):',
-          finalResult: `${finalToClient.toFixed(5)} ${symbol}`,
-          amountToBuy: `${cryptoBought.toFixed(5)} ${symbol}`,
+          finalResult: `${finalToClient.toFixed(decimalsAllowed)} ${symbol}`,
+          amountToBuy: `${(cryptoBought * roundingFactor / roundingFactor).toFixed(decimalsAllowed)} ${symbol}`,
           breakdown: `
             <strong>פירוט עסקה מלא:</strong><br/>
             • הלקוח שילם: ${formatFiat(inputILS, rateUSD / rateILS)}<br/>
@@ -204,6 +229,8 @@ export default function SmartConverter() {
             • תקציב קנייה (נטו): ${formatFiat(buyBudgetILS, rateUSD / rateILS)}<br/>
             • עמלת רשת: ${coin.networkFee} ${symbol}<br/>
             • עמלת Bybit: 2%<br/>
+            • ${slippageWarning}<br/>
+            • עוגל לפי חוקי הבורסה: (עוגל לפי חוקי הבורסה)<br/>
           `
         })
 
@@ -462,6 +489,29 @@ export default function SmartConverter() {
           <div className="bg-gray-800 rounded-lg p-3">
             <div className="text-xs text-gray-400 mb-2">מגמה 20 שעות אחרונות:</div>
             <Sparkline data={klineData} />
+          </div>
+        )}
+
+        {/* Volatility Gauge */}
+        {volatility > 0 && (
+          <div className="bg-gray-800 rounded-lg p-3 mb-4">
+            <div className="text-xs text-gray-400 mb-2">תנודתיות מחירים:</div>
+            <div className="flex items-center gap-2">
+              {volatility > 5 ? (
+                <span className="bg-red-900/30 text-red-400 px-2 py-1 rounded-full text-xs font-medium">
+                  🔴 תנודתיות גבוהה (סיכון)
+                </span>
+              ) : volatility > 2 ? (
+                <span className="bg-yellow-900/30 text-yellow-400 px-2 py-1 rounded-full text-xs font-medium">
+                  🟡 תנודתיות בינונית
+                </span>
+              ) : (
+                <span className="bg-green-900/30 text-green-400 px-2 py-1 rounded-full text-xs font-medium">
+                  🟢 שוק יציב
+                </span>
+              )}
+              <span className="text-xs text-gray-300">({volatility.toFixed(1)}%)</span>
+            </div>
           </div>
         )}
       </div>
