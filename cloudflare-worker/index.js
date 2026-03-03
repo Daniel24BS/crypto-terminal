@@ -229,6 +229,90 @@ export default {
         }
       }
 
+      // ROUTE: Gemini AI Chat (AI assistant)
+      if (action === 'ASK_GEMINI') {
+        try {
+          console.log("Handling ASK_GEMINI request");
+          
+          const prompt = body.prompt;
+          const systemContext = body.systemContext;
+          
+          if (!prompt) {
+            return new Response(JSON.stringify({ error: 'No prompt provided' }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Build Gemini API request
+          const geminiRequest = {
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            systemInstruction: systemContext ? {
+              parts: [{
+                text: systemContext
+              }]
+            } : undefined,
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 1024,
+            }
+          };
+
+          // Remove systemInstruction if not provided
+          if (!systemContext) {
+            delete geminiRequest.systemInstruction;
+          }
+
+          console.log("Sending request to Gemini API");
+          
+          const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyAx4LGE8hjb1IbFkLXJfstH-eA7a-EvF_E`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(geminiRequest)
+          });
+
+          if (!geminiResponse.ok) {
+            const errorText = await geminiResponse.text();
+            console.error("Gemini API error:", errorText);
+            throw new Error(`Gemini API failed: ${geminiResponse.status} ${errorText}`);
+          }
+
+          const geminiData = await geminiResponse.json();
+          const aiResponse = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+
+          console.log("Gemini response received");
+          
+          return new Response(JSON.stringify({ 
+            response: aiResponse,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+
+        } catch (error) {
+          console.error("ASK_GEMINI error:", error);
+          return new Response(JSON.stringify({ 
+            error: error.message || 'Failed to process AI request',
+            details: error.toString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // ROUTE: Get coin prices from Bybit (public endpoint, no API keys required)
       if (action === 'fetch_price' || action === 'get_market_price') {
         try {

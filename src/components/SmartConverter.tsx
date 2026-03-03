@@ -23,6 +23,13 @@ interface Transaction {
   fee: number
 }
 
+interface GeminiMessage {
+  id: string
+  text: string
+  sender: 'user' | 'ai'
+  timestamp: string
+}
+
 const coins: Coin[] = [
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', networkFee: 0.0002 },
   { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', networkFee: 0.0012 },
@@ -63,6 +70,11 @@ export default function SmartConverter() {
   const [decimalsAllowed, setDecimalsAllowed] = useState(8)
   const [spreadPercent, setSpreadPercent] = useState(0)
   const [volatility, setVolatility] = useState(0)
+  const [geminiMessages, setGeminiMessages] = useState<GeminiMessage[]>([])
+  const [geminiInput, setGeminiInput] = useState('')
+  const [isGeminiOpen, setIsGeminiOpen] = useState(false)
+  const [isGeminiLoading, setIsGeminiLoading] = useState(false)
+  const [currentPrice, setCurrentPrice] = useState(0)
 
   const bybitFiatFee = 0.02
 
@@ -161,6 +173,7 @@ export default function SmartConverter() {
             rateUSD = tickerData.price || 0
             setDecimalsAllowed(tickerData.decimalsAllowed || 8)
             setSpreadPercent(tickerData.spreadPercent || 0)
+            setCurrentPrice(rateUSD)
             console.log(`Fetched ticker price for ${symbol}: $${rateUSD}, decimals: ${tickerData.decimalsAllowed}, spread: ${tickerData.spreadPercent}%`)
           } else {
             const errorText = await tickerResponse.text()
@@ -407,6 +420,74 @@ export default function SmartConverter() {
     )
   }
 
+  // Gemini Chat Functions
+  const buildSystemContext = () => {
+    const coin = coins.find(c => c.id === selectedCoin)
+    const volatilityLevel = volatility > 5 ? 'גבוהה' : volatility > 2 ? 'בינונית' : 'נמוכה'
+    
+    return `אתה עוזר לטרמינל קריפטו מתקדם עם נתוני מחירים וניהול סיכונים. 
+מידע נוכחי:
+- מטבע נבחר: ${coin?.symbol || selectedCoin}
+- מחיר נוכחי: $${rateUSD?.toFixed(2) || 'טוען'}
+- תנודתיות: ${volatility.toFixed(1)}% (${volatilityLevel})
+- פער מחירים (Spread): ${spreadPercent.toFixed(2)}%
+- עמלת שירות: 10₪ קבועה או 10% מהסכום
+- עיגול לפי חוקי הבורסה: ${decimalsAllowed} ספרות עשרוניות
+
+השתמש במידע זה כדי לתת תשובות מדויקות ומותאמות לסוחר קריפטו. ענה בעברית בלבד.`
+  }
+
+  const sendGeminiMessage = async () => {
+    if (!geminiInput.trim()) return
+
+    const userMessage: GeminiMessage = {
+      id: Date.now().toString(),
+      text: geminiInput,
+      sender: 'user',
+      timestamp: new Date().toISOString()
+    }
+
+    setGeminiMessages(prev => [...prev, userMessage])
+    setIsGeminiLoading(true)
+
+    try {
+      const response = await fetch('https://crypto-terminal-api.07daniel50.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ASK_GEMINI',
+          prompt: geminiInput,
+          systemContext: buildSystemContext()
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const aiMessage: GeminiMessage = {
+          id: (Date.now() + 1).toString(),
+          text: data.response || 'מצטערים, לא הצלחתי לקבל תשובה.',
+          sender: 'ai',
+          timestamp: new Date().toISOString()
+        }
+        setGeminiMessages(prev => [...prev, aiMessage])
+      } else {
+        throw new Error('Failed to get AI response')
+      }
+    } catch (error) {
+      console.error('Gemini error:', error)
+      const errorMessage: GeminiMessage = {
+        id: (Date.now() + 1).toString(),
+        text: 'שגיאה בתקשורת עם השרת. נסה לנסות שוב.',
+        sender: 'ai',
+        timestamp: new Date().toISOString()
+      }
+      setGeminiMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsGeminiLoading(false)
+      setGeminiInput('')
+    }
+  }
+
   return (
     <div className="bg-gray-900 rounded-xl p-6 shadow-xl">
       <div className="flex justify-between items-center mb-6">
@@ -595,6 +676,92 @@ export default function SmartConverter() {
           <div>• עמלות רשת לפי מטבע</div>
           <div className="text-xs text-gray-400 mt-2">העמלה מחושבת אוטומטית לפי גודל העסקה</div>
         </div>
+      </div>
+
+      {/* Gemini AI Chat Widget */}
+      <div className="fixed bottom-4 right-4 z-50">
+        {/* Floating Action Button */}
+        {!isGeminiOpen && (
+          <button
+            onClick={() => setIsGeminiOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all hover:scale-110"
+            title="פתח צ'אט AI"
+          >
+            💬
+          </button>
+        )}
+
+        {/* Chat Window */}
+        {isGeminiOpen && (
+          <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl w-96 h-96 flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center p-3 border-b border-gray-700">
+              <h3 className="text-white font-medium">🤖 עוזר קריפטו AI</h3>
+              <button
+                onClick={() => setIsGeminiOpen(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {geminiMessages.length === 0 && (
+                <div className="text-gray-400 text-sm text-center">
+                  שלום! אני עוזר קריפטו מתקדם. איך אוכל לעזור לך?
+                </div>
+              )}
+              
+              {geminiMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                      msg.sender === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-100'
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              
+              {isGeminiLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-700 text-gray-100 px-3 py-2 rounded-lg text-sm">
+                    🤔 Gemini מנתח...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <div className="p-3 border-t border-gray-700">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={geminiInput}
+                  onChange={(e) => setGeminiInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendGeminiMessage()}
+                  placeholder="שאל את העוזר קריפטו..."
+                  className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                  dir="rtl"
+                />
+                <button
+                  onClick={sendGeminiMessage}
+                  disabled={isGeminiLoading || !geminiInput.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  שלח
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
