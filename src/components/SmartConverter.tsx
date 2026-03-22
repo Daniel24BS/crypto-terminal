@@ -1,6 +1,32 @@
 import { useState, useEffect } from 'react'
 import { usePortfolio } from '../context/PortfolioContext'
 
+// Core Constants
+const MINIMUM_FEE_ILS = 10
+
+// Network Fees (Fixed)
+const networkFees: { [key: string]: number } = {
+  'SOL': 0.008,
+  'USDT': 1.0,
+  'BTC': 0.0002,
+  'ETH': 0.0012,
+  'XRP': 0.2,
+  'LTC': 0.001,
+  'ADA': 0.17,
+  'AVAX': 0.001,
+  'DOGE': 5.0,
+  'SHIB': 100000,
+  'PEPE': 500000,
+  'DOT': 0.1,
+  'LINK': 0.01,
+  'NEAR': 0.025,
+  'BCH': 0.0001,
+  'FET': 0.1,
+  'INJ': 0.01,
+  'KAS': 0.1,
+  'TON': 0.05
+}
+
 interface Coin {
   id: string
   symbol: string
@@ -13,6 +39,9 @@ interface ConversionResult {
   amountToBuy: string
   breakdown: string
   resultLabel: string
+  amountToBuyOnBybit: string
+  netProfit: number
+  profitMargin: number
 }
 
 interface Transaction {
@@ -24,24 +53,24 @@ interface Transaction {
 }
 
 const coins: Coin[] = [
-  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', networkFee: 0.0002 },
-  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', networkFee: 0.0012 },
-  { id: 'solana', symbol: 'SOL', name: 'Solana', networkFee: 0.008 },
-  { id: 'xrp', symbol: 'XRP', name: 'Ripple', networkFee: 0.2 },
-  { id: 'litecoin', symbol: 'LTC', name: 'Litecoin', networkFee: 0.001 },
-  { id: 'cardano', symbol: 'ADA', name: 'Cardano', networkFee: 0.17 },
-  { id: 'avalanche', symbol: 'AVAX', name: 'Avalanche', networkFee: 0.001 },
-  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', networkFee: 5.0 },
-  { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu', networkFee: 100000 },
-  { id: 'pepe', symbol: 'PEPE', name: 'Pepe', networkFee: 500000 },
-  { id: 'polkadot', symbol: 'DOT', name: 'Polkadot', networkFee: 0.1 },
-  { id: 'chainlink', symbol: 'LINK', name: 'Chainlink', networkFee: 0.01 },
-  { id: 'near', symbol: 'NEAR', name: 'NEAR Protocol', networkFee: 0.025 },
-  { id: 'bitcoin-cash', symbol: 'BCH', name: 'Bitcoin Cash', networkFee: 0.0001 },
-  { id: 'fetch', symbol: 'FET', name: 'Fetch.ai', networkFee: 0.1 },
-  { id: 'injective', symbol: 'INJ', name: 'Injective', networkFee: 0.01 },
-  { id: 'kaspa', symbol: 'KAS', name: 'Kaspa', networkFee: 0.1 },
-  { id: 'toncoin', symbol: 'TON', name: 'Toncoin', networkFee: 0.05 }
+  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', networkFee: networkFees['BTC'] },
+  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', networkFee: networkFees['ETH'] },
+  { id: 'solana', symbol: 'SOL', name: 'Solana', networkFee: networkFees['SOL'] },
+  { id: 'xrp', symbol: 'XRP', name: 'Ripple', networkFee: networkFees['XRP'] },
+  { id: 'litecoin', symbol: 'LTC', name: 'Litecoin', networkFee: networkFees['LTC'] },
+  { id: 'cardano', symbol: 'ADA', name: 'Cardano', networkFee: networkFees['ADA'] },
+  { id: 'avalanche', symbol: 'AVAX', name: 'Avalanche', networkFee: networkFees['AVAX'] },
+  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin', networkFee: networkFees['DOGE'] },
+  { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu', networkFee: networkFees['SHIB'] },
+  { id: 'pepe', symbol: 'PEPE', name: 'Pepe', networkFee: networkFees['PEPE'] },
+  { id: 'polkadot', symbol: 'DOT', name: 'Polkadot', networkFee: networkFees['DOT'] },
+  { id: 'chainlink', symbol: 'LINK', name: 'Chainlink', networkFee: networkFees['LINK'] },
+  { id: 'near', symbol: 'NEAR', name: 'NEAR Protocol', networkFee: networkFees['NEAR'] },
+  { id: 'bitcoin-cash', symbol: 'BCH', name: 'Bitcoin Cash', networkFee: networkFees['BCH'] },
+  { id: 'fetch', symbol: 'FET', name: 'Fetch.ai', networkFee: networkFees['FET'] },
+  { id: 'injective', symbol: 'INJ', name: 'Injective', networkFee: networkFees['INJ'] },
+  { id: 'kaspa', symbol: 'KAS', name: 'Kaspa', networkFee: networkFees['KAS'] },
+  { id: 'toncoin', symbol: 'TON', name: 'Toncoin', networkFee: networkFees['TON'] }
 ]
 
 export default function SmartConverter() {
@@ -65,8 +94,9 @@ export default function SmartConverter() {
   const [volatility, setVolatility] = useState(0)
   const [rateUSD, setRateUSD] = useState(0)
   const [isRefreshingRate, setIsRefreshingRate] = useState(false)
-
-  const bybitFiatFee = 0.02
+  const [bybitFiatFee, setBybitFiatFee] = useState(5.5)
+  const [currentCryptoToILSRate, setCurrentCryptoToILSRate] = useState(0)
+  const [currentUSDToILSRate, setCurrentUSDToILSRate] = useState(0)
 
   // Update exchange rate when portfolio data changes
   useEffect(() => {
@@ -128,183 +158,167 @@ export default function SmartConverter() {
       const val = parseFloat(value)
       if (!isNaN(val)) {
         setUsdValue((val / baseExchangeRate).toFixed(2))
+        // Auto-update USD input when ILS changes
+        const usdEquivalent = val / baseExchangeRate
+        setUsdValue(usdEquivalent.toFixed(2))
       } else {
-        setUsdValue('')
+        setIlsValue('')
       }
     } else {
       const val = parseFloat(value)
       if (!isNaN(val)) {
         setIlsValue((val * baseExchangeRate).toFixed(2))
+        // Auto-update ILS input when USD changes
+        const ilsEquivalent = val * baseExchangeRate
+        setIlsValue(ilsEquivalent.toFixed(2))
       } else {
-        setIlsValue('')
+        setUsdValue('')
       }
     }
   }
 
-  const formatFiat = (ilsVal: number, usdRate?: number) => {
-    const usdVal = usdRate ? ilsVal * usdRate : ilsVal / baseExchangeRate
-    return `${ilsVal.toFixed(2)} ₪ ($${usdVal.toFixed(2)})`
+  const formatFiat = (amount: number, rate?: number) => {
+    const usdVal = rate ? amount * rate : amount / baseExchangeRate
+    return `${amount.toFixed(2)} ₪ ($${usdVal.toFixed(2)})`
   }
 
   const calculate = async () => {
     let inputILS = 0
     let inputCrypto = 0
+    let rateILS = 0
 
     if (!isInverse) {
+      // Mode A: Fiat to Crypto (Client pays ILS/USD)
       inputILS = parseFloat(ilsValue) || parseFloat(usdValue) * baseExchangeRate
       if (!inputILS || inputILS <= 0) {
         alert('הכנס סכום תקין בשקלים או דולרים')
         return
       }
+      
+      // Get current crypto price from CoinGecko
+      let cryptoPriceUSD = 0
+      try {
+        const coin = coins.find(c => c.id === selectedCoin)
+        if (coin) {
+          const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd`)
+          if (response.ok) {
+            const data = await response.json()
+            cryptoPriceUSD = data[coin.id]?.usd || 0
+            console.log(`Fetched ${coin.symbol} price: $${cryptoPriceUSD}`)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch crypto price:', error)
+      }
+
+      rateILS = cryptoPriceUSD * baseExchangeRate
+      setCurrentCryptoToILSRate(rateILS)
+      setCurrentUSDToILSRate(baseExchangeRate)
+      
+      // Calculate profit margin
+      const profitRate = inputILS < 400 ? 0.10 : 0.15
+      const myProfitILS = Math.max(inputILS * profitRate, MINIMUM_FEE_ILS)
+      
+      if (inputILS <= myProfitILS) {
+        alert(`סכום נמוך מדי לעסקה (מינימום ₪${MINIMUM_FEE_ILS})`)
+        return
+      }
+      
+      const buyBudgetILS = inputILS - myProfitILS
+      const cryptoBought = (buyBudgetILS * (1 - bybitFiatFee)) / rateILS
+      const networkFee = coins.find(c => c.id === selectedCoin)?.networkFee || 0
+      let finalToClient = Math.max(0, cryptoBought - networkFee)
+      
+      // Apply lot size rounding
+      const roundingFactor = Math.pow(10, decimalsAllowed)
+      finalToClient = Math.floor(finalToClient * roundingFactor) / roundingFactor
+      
+      const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
+      
+      // Check for slippage warning
+      const slippageWarning = spreadPercent > 0.5 ? 
+        '⚠️ אזהרת נזילות: פער מחירים (Spread) גבוה' : ''
+      
+      setResult({
+        resultLabel: 'נטו ללקוח (אחרי עמלות):',
+        finalResult: `${finalToClient.toFixed(decimalsAllowed)} ${selectedCoin.toUpperCase()}`,
+        amountToBuy: `${(cryptoBought * roundingFactor / roundingFactor).toFixed(decimalsAllowed)} ${selectedCoin.toUpperCase()}`,
+        amountToBuyOnBybit: `${(cryptoBought * roundingFactor / roundingFactor).toFixed(decimalsAllowed)} ${selectedCoin.toUpperCase()}`,
+        netProfit: myProfitILS,
+        profitMargin: profitRate * 100,
+        breakdown: `
+          <strong>פירוט עסקה מלא:</strong><br/>
+          • הלקוח שילם: ${formatFiat(inputILS, rateILS)}<br/>
+          • תקציב קנייה (נטו): <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateILS)}</span> (${feeType})<br/>
+          • תקציב לקנייה (נטו): ${formatFiat(buyBudgetILS, rateILS)}<br/>
+          • עמלת רשת: ${networkFee.toFixed(6)} ${selectedCoin.toUpperCase()}<br/>
+          • עמלת Bybit: ${bybitFiatFee}%<br/>
+          • ${slippageWarning}<br/>
+          • עוגל לפי חוקי הבורסה: (עוגל לפי חוקי הבורסה)<br/>
+        `
+      })
+      
     } else {
+      // Mode B: Crypto to Fiat (Client requests exactly X Crypto)
       inputCrypto = parseFloat(cryptoValue)
       if (!inputCrypto || inputCrypto <= 0) {
         alert('הכנס כמות מטבעות תקינה')
         return
       }
-    }
-
-    setLoading(true)
-    setResult(null)
-
-    try {
-      // Get coin info
-      const coin = coins.find(c => c.id === selectedCoin)!
-      const symbol = coin.symbol
-      let rateUSD = 0
       
-      // Try to get price from portfolio first (faster)
-      const portfolioAsset = balances?.unified?.find(asset => asset.coin === symbol)
-      
-      if (portfolioAsset && (portfolioAsset as any).price && (portfolioAsset as any).price > 0) {
-        // Use portfolio price if available
-        rateUSD = (portfolioAsset as any).price
-        console.log(`Using portfolio price for ${symbol}: $${rateUSD}`)
-      } else {
-        // Fetch price from Worker using GET_TICKER
-        console.log("Fetching external price for:", symbol)
-        setPriceLoading(true)
-        
-        try {
-          const tickerResponse = await fetch('https://crypto-terminal-api.07daniel50.workers.dev/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ action: 'GET_TICKER', coin: symbol })
-          })
-          
-          console.log("Worker response status:", tickerResponse.status)
-          
-          if (tickerResponse.ok) {
-            const tickerData = await tickerResponse.json()
-            console.log("Worker response data:", tickerData)
-            rateUSD = tickerData.price || 0
-            setDecimalsAllowed(tickerData.decimalsAllowed || 8)
-            setSpreadPercent(tickerData.spreadPercent || 0)
-            setRateUSD(rateUSD)
-            console.log(`Fetched ticker price for ${symbol}: $${rateUSD}, decimals: ${tickerData.decimalsAllowed}, spread: ${tickerData.spreadPercent}%`)
-          } else {
-            const errorText = await tickerResponse.text()
-            console.error(`Failed to fetch ticker for ${symbol}. Status: ${tickerResponse.status}, Error: ${errorText}`)
+      // Get current crypto price from CoinGecko
+      let cryptoPriceUSD = 0
+      try {
+        const coin = coins.find(c => c.id === selectedCoin)
+        if (coin) {
+          const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd`)
+          if (response.ok) {
+            const data = await response.json()
+            cryptoPriceUSD = data[coin.id]?.usd || 0
+            console.log(`Fetched ${coin.symbol} price: $${cryptoPriceUSD}`)
           }
-        } catch (error) {
-          console.error(`Error fetching ticker for ${symbol}:`, error)
-        } finally {
-          setPriceLoading(false)
         }
+      } catch (error) {
+        console.error('Failed to fetch crypto price:', error)
       }
 
-      if (rateUSD === 0) {
-        console.warn(`Price not available for ${symbol}`)
-        return
-      }
-
-      const rateILS = rateUSD * baseExchangeRate
-      console.log(`Final price for ${symbol}: $${rateUSD} (₪${rateILS.toFixed(2)})`)
+      rateILS = cryptoPriceUSD * baseExchangeRate
+      setCurrentCryptoToILSRate(rateILS)
+      setCurrentUSDToILSRate(baseExchangeRate)
       
-      // Calculate volatility from kline data
-      let calculatedVolatility = 0
-      if (klineData.length >= 2) {
-        const maxPrice = Math.max(...klineData)
-        const minPrice = Math.min(...klineData)
-        calculatedVolatility = ((maxPrice - minPrice) / minPrice) * 100
-        console.log(`Volatility for ${symbol}: ${calculatedVolatility.toFixed(1)}% (max: $${maxPrice}, min: $${minPrice})`)
-      }
+      // Calculate profit margin
+      const coin = coins.find(c => c.id === selectedCoin)
+      const networkFee = coin?.networkFee || 0
+      const cryptoToBuy = inputCrypto + networkFee
+      const budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
+      const profitRate = budgetNeededILS < 360 ? 0.10 : 0.15
+      const calculatedProfitILS = (budgetNeededILS / (1 - profitRate)) - budgetNeededILS
+      const myProfitILS = Math.max(calculatedProfitILS, MINIMUM_FEE_ILS)
+      const totalToPayILS = budgetNeededILS + myProfitILS
       
-      // Update volatility state for UI
-      setVolatility(calculatedVolatility)
-
-      if (!isInverse) {
-        // Fiat to Crypto mode
-        const myProfitILS = calculateFee(inputILS)
-
-        if (inputILS <= myProfitILS) {
-          setLoading(false)
-          alert('הסכום נמוך מדי לעסקה (מכסה רק את עמלת השירות שלך)')
-          return
-        }
-
-        let buyBudgetILS = inputILS - myProfitILS
-        let cryptoBought = (buyBudgetILS * (1 - bybitFiatFee)) / rateILS
-        let finalToClient = cryptoBought - coin.networkFee
-        if (finalToClient < 0) finalToClient = 0
-
-        // Apply lot size rounding (Feature 12)
-        const roundingFactor = Math.pow(10, decimalsAllowed)
-        finalToClient = Math.floor(finalToClient * roundingFactor) / roundingFactor
-
-        const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
-        
-        // Check for slippage warning (Feature 1)
-        const slippageWarning = spreadPercent > 0.5 ? 
-          '⚠️ אזהרת נזילות: פער מחירים (Spread) גבוה' : ''
-        
-        setResult({
-          resultLabel: 'נטו ללקוח (אחרי עמלות):',
-          finalResult: `${finalToClient.toFixed(decimalsAllowed)} ${symbol}`,
-          amountToBuy: `${(cryptoBought * roundingFactor / roundingFactor).toFixed(decimalsAllowed)} ${symbol}`,
-          breakdown: `
-            <strong>פירוט עסקה מלא:</strong><br/>
-            • הלקוח שילם: ${formatFiat(inputILS, rateUSD / rateILS)}<br/>
-            • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
-            • תקציב קנייה (נטו): ${formatFiat(buyBudgetILS, rateUSD / rateILS)}<br/>
-            • עמלת רשת: ${coin.networkFee} ${symbol}<br/>
-            • עמלת Bybit: 2%<br/>
-            • ${slippageWarning}<br/>
-            • עוגל לפי חוקי הבורסה: (עוגל לפי חוקי הבורסה)<br/>
-          `
-        })
-
-      } else {
-        // Crypto to Fiat mode (inverse)
-        let cryptoToBuy = inputCrypto + coin.networkFee
-        let budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
-        
-        const myProfitILS = calculateFee(budgetNeededILS)
-        let totalToPayILS = budgetNeededILS + myProfitILS
-
-        const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
-
-        setResult({
-          resultLabel: 'הלקוח צריך לשלם בסך הכל:',
-          finalResult: formatFiat(totalToPayILS, rateUSD / rateILS),
-          amountToBuy: `${cryptoToBuy.toFixed(5)} ${symbol}`,
-          breakdown: `
-            <strong>פירוט עסקה (חישוב הפוך):</strong><br/>
-            • הלקוח יקבל: ${inputCrypto} ${symbol}<br/>
-            • עמלת שירות שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateUSD / rateILS)}</span> (${feeType})<br/>
-            • שער המטבע: 1 ${symbol} = ${rateILS.toFixed(2)} ₪ / $${rateUSD.toFixed(2)}<br/>
-            • עמלת Bybit: 2%<br/>
-          `
-        })
-      }
-    } catch (e) {
-      console.error('Calculation error:', e)
-      alert('שגיאה בחישוב - בדוק נתונים')
-    } finally {
-      setLoading(false)
+      const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
+      
+      setResult({
+        resultLabel: 'הלקוח צריך לשלם בסך הכל:',
+        finalResult: formatFiat(totalToPayILS, rateILS),
+        amountToBuy: `${cryptoToBuy.toFixed(6)} ${selectedCoin.toUpperCase()}`,
+        amountToBuyOnBybit: `${cryptoToBuy.toFixed(6)} ${selectedCoin.toUpperCase()}`,
+        netProfit: myProfitILS,
+        profitMargin: profitRate * 100,
+        breakdown: `
+          <strong>פירוט עסקה מלא:</strong><br/>
+          • הלקוח יקבל: ${inputCrypto} ${selectedCoin.toUpperCase()}<br/>
+          • תקציב קנייה (נטו): <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateILS)}</span> (${feeType})<br/>
+          • תקציב לקנייה (נטו): ${formatFiat(budgetNeededILS, rateILS)}<br/>
+          • עמלת רשת: ${networkFee.toFixed(6)} ${selectedCoin.toUpperCase()}<br/>
+          • עמלת Bybit: ${bybitFiatFee}%<br/>
+          • שער המטבע: 1 ${selectedCoin.toUpperCase()} = ${rateILS.toFixed(2)} ₪ / $${cryptoPriceUSD.toFixed(2)}<br/>
+          • עוגל לפי חוקי הבורסה: (עוגל לפי חוקי הבורסה)<br/>
+        `
+      })
     }
+    
+    setLoading(false)
   }
 
   const copyToClipboard = () => {
@@ -557,6 +571,27 @@ export default function SmartConverter() {
           </button>
         </div>
         <div className="text-xs text-gray-500 mt-1">מתעדכן אוטומטית כל 60 שניות</div>
+      </div>
+
+      {/* Editable Spread Fee Input */}
+      <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded-lg">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-red-400">⚠️ עמלת Bybit (פער נסתר):</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={bybitFiatFee}
+              onChange={(e) => setBybitFiatFee(parseFloat(e.target.value) || 5.5)}
+              step="0.1"
+              min="0"
+              max="20"
+              className="w-24 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-red-500"
+              placeholder="5.5"
+            />
+            <span className="text-sm text-red-400">%</span>
+          </div>
+        </div>
+        <div className="text-xs text-red-500 mt-1">בדוק את העמלה לפי ספק הצרכים שלך</div>
       </div>
 
       {!isInverse ? (
