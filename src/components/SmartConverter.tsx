@@ -183,124 +183,98 @@ export default function SmartConverter() {
   }
 
   const calculate = async () => {
-    let inputILS = 0
-    let inputCrypto = 0
-    let rateILS = 0
+    // Assume these variables are pulled from the state/API
+    const MINIMUM_FEE_ILS = 10;
+    const feeInput = bybitFiatFee / 100; // e.g., 5.5% -> 0.055
+    const networkFee = coins.find(c => c.id === selectedCoin)?.networkFee || 0;
+    
+    // Fetch current crypto price from CoinGecko
+    let rateILS = 0;
+    try {
+      const coin = coins.find(c => c.id === selectedCoin)
+      if (coin) {
+        const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd`)
+        if (response.ok) {
+          const data = await response.json()
+          const cryptoPriceUSD = data[coin.id]?.usd || 0
+          rateILS = cryptoPriceUSD * baseExchangeRate
+          console.log(`Fetched ${coin.symbol} price: $${cryptoPriceUSD}, ₪${rateILS.toFixed(2)}`)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch crypto price:', error)
+      alert('שגיאה בקבלת מחיר מטבע')
+      return
+    }
+
+    if (!rateILS || rateILS <= 0) {
+      alert('לא ניתן לקבל מחיר עבור המטבע')
+      return
+    }
 
     if (!isInverse) {
-      // Mode A: Fiat to Crypto (Client pays ILS/USD)
-      inputILS = parseFloat(ilsValue) || parseFloat(usdValue) * baseExchangeRate
+      // MODE: Client pays ILS
+      const inputILS = parseFloat(ilsValue) || parseFloat(usdValue) * baseExchangeRate
+      
       if (!inputILS || inputILS <= 0) {
         alert('הכנס סכום תקין בשקלים או דולרים')
         return
       }
-      
-      // Get current crypto price from CoinGecko
-      let cryptoPriceUSD = 0
-      try {
-        const coin = coins.find(c => c.id === selectedCoin)
-        if (coin) {
-          const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd`)
-          if (response.ok) {
-            const data = await response.json()
-            cryptoPriceUSD = data[coin.id]?.usd || 0
-            console.log(`Fetched ${coin.symbol} price: $${cryptoPriceUSD}`)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch crypto price:', error)
-      }
 
-      rateILS = cryptoPriceUSD * baseExchangeRate
-      setCurrentCryptoToILSRate(rateILS)
-      setCurrentUSDToILSRate(baseExchangeRate)
-      
-      // Calculate profit margin
-      const profitRate = inputILS < 400 ? 0.10 : 0.15
-      const myProfitILS = Math.max(inputILS * profitRate, MINIMUM_FEE_ILS)
-      
+      const profitRate = inputILS < 400 ? 0.10 : 0.15;
+      const calculatedProfit = inputILS * profitRate;
+      const myProfitILS = Math.max(calculatedProfit, MINIMUM_FEE_ILS);
+
       if (inputILS <= myProfitILS) {
         alert(`סכום נמוך מדי לעסקה (מינימום ₪${MINIMUM_FEE_ILS})`)
-        return
+        return;
       }
+
+      const buyBudgetILS = inputILS - myProfitILS;
+      const cryptoBought = (buyBudgetILS * (1 - feeInput)) / rateILS;
+      const finalToClient = Math.max(0, cryptoBought - networkFee);
       
-      const buyBudgetILS = inputILS - myProfitILS
-      const cryptoBought = (buyBudgetILS * (1 - bybitFiatFee)) / rateILS
-      const networkFee = coins.find(c => c.id === selectedCoin)?.networkFee || 0
-      let finalToClient = Math.max(0, cryptoBought - networkFee)
-      
-      // Apply lot size rounding
-      const roundingFactor = Math.pow(10, decimalsAllowed)
-      finalToClient = Math.floor(finalToClient * roundingFactor) / roundingFactor
-      
-      const feeType = inputILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
-      
-      // Check for slippage warning
-      const slippageWarning = spreadPercent > 0.5 ? 
-        '⚠️ אזהרת נזילות: פער מחירים (Spread) גבוה' : ''
-      
+      // Update state with results
       setResult({
         resultLabel: 'נטו ללקוח (אחרי עמלות):',
-        finalResult: `${finalToClient.toFixed(decimalsAllowed)} ${selectedCoin.toUpperCase()}`,
-        amountToBuy: `${(cryptoBought * roundingFactor / roundingFactor).toFixed(decimalsAllowed)} ${selectedCoin.toUpperCase()}`,
-        amountToBuyOnBybit: `${(cryptoBought * roundingFactor / roundingFactor).toFixed(decimalsAllowed)} ${selectedCoin.toUpperCase()}`,
+        finalResult: `${finalToClient.toFixed(6)} ${selectedCoin.toUpperCase()}`,
+        amountToBuy: `${cryptoBought.toFixed(6)} ${selectedCoin.toUpperCase()}`,
+        amountToBuyOnBybit: `${cryptoBought.toFixed(6)} ${selectedCoin.toUpperCase()}`,
         netProfit: myProfitILS,
         profitMargin: profitRate * 100,
         breakdown: `
           <strong>פירוט עסקה מלא:</strong><br/>
-          • הלקוח שילם: ${formatFiat(inputILS, rateILS)}<br/>
-          • תקציב קנייה (נטו): <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateILS)}</span> (${feeType})<br/>
-          • תקציב לקנייה (נטו): ${formatFiat(buyBudgetILS, rateILS)}<br/>
+          • הלקוח שילם: ${formatFiat(inputILS)}<br/>
+          • רווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS)}</span> (${(profitRate * 100).toFixed(0)}%${myProfitILS === MINIMUM_FEE_ILS ? ' - מינימום' : ''})<br/>
+          • תקציב לקנייה ב-Bybit: ${formatFiat(buyBudgetILS)}<br/>
           • עמלת רשת: ${networkFee.toFixed(6)} ${selectedCoin.toUpperCase()}<br/>
           • עמלת Bybit: ${bybitFiatFee}%<br/>
-          • ${slippageWarning}<br/>
-          • עוגל לפי חוקי הבורסה: (עוגל לפי חוקי הבורסה)<br/>
+          • שער המטבע: 1 ${selectedCoin.toUpperCase()} = ${rateILS.toFixed(2)} ₪<br/>
         `
-      })
-      
+      });
+
     } else {
-      // Mode B: Crypto to Fiat (Client requests exactly X Crypto)
-      inputCrypto = parseFloat(cryptoValue)
+      // INVERSE MODE: Client wants exactly X Crypto
+      const inputCrypto = parseFloat(cryptoValue)
+      
       if (!inputCrypto || inputCrypto <= 0) {
         alert('הכנס כמות מטבעות תקינה')
         return
       }
-      
-      // Get current crypto price from CoinGecko
-      let cryptoPriceUSD = 0
-      try {
-        const coin = coins.find(c => c.id === selectedCoin)
-        if (coin) {
-          const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd`)
-          if (response.ok) {
-            const data = await response.json()
-            cryptoPriceUSD = data[coin.id]?.usd || 0
-            console.log(`Fetched ${coin.symbol} price: $${cryptoPriceUSD}`)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch crypto price:', error)
-      }
 
-      rateILS = cryptoPriceUSD * baseExchangeRate
-      setCurrentCryptoToILSRate(rateILS)
-      setCurrentUSDToILSRate(baseExchangeRate)
+      const cryptoToBuy = inputCrypto + networkFee;
+      const budgetNeededILS = (cryptoToBuy * rateILS) / (1 - feeInput);
       
-      // Calculate profit margin
-      const coin = coins.find(c => c.id === selectedCoin)
-      const networkFee = coin?.networkFee || 0
-      const cryptoToBuy = inputCrypto + networkFee
-      const budgetNeededILS = (cryptoToBuy * rateILS) / (1 - bybitFiatFee)
-      const profitRate = budgetNeededILS < 360 ? 0.10 : 0.15
-      const calculatedProfitILS = (budgetNeededILS / (1 - profitRate)) - budgetNeededILS
-      const myProfitILS = Math.max(calculatedProfitILS, MINIMUM_FEE_ILS)
-      const totalToPayILS = budgetNeededILS + myProfitILS
+      const profitRate = budgetNeededILS < 360 ? 0.10 : 0.15;
+      const calculatedProfitILS = (budgetNeededILS / (1 - profitRate)) - budgetNeededILS;
+      const myProfitILS = Math.max(calculatedProfitILS, MINIMUM_FEE_ILS);
       
-      const feeType = budgetNeededILS > 200 ? '10% מהסכום' : 'עמלה קבועה של 10₪'
-      
+      const totalToPayILS = budgetNeededILS + myProfitILS;
+
+      // Update state with results
       setResult({
         resultLabel: 'הלקוח צריך לשלם בסך הכל:',
-        finalResult: formatFiat(totalToPayILS, rateILS),
+        finalResult: formatFiat(totalToPayILS),
         amountToBuy: `${cryptoToBuy.toFixed(6)} ${selectedCoin.toUpperCase()}`,
         amountToBuyOnBybit: `${cryptoToBuy.toFixed(6)} ${selectedCoin.toUpperCase()}`,
         netProfit: myProfitILS,
@@ -308,17 +282,14 @@ export default function SmartConverter() {
         breakdown: `
           <strong>פירוט עסקה מלא:</strong><br/>
           • הלקוח יקבל: ${inputCrypto} ${selectedCoin.toUpperCase()}<br/>
-          • תקציב קנייה (נטו): <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS, rateILS)}</span> (${feeType})<br/>
-          • תקציב לקנייה (נטו): ${formatFiat(budgetNeededILS, rateILS)}<br/>
+          • רווח שלך: <span style="color:#2e7d32;font-weight:bold;">${formatFiat(myProfitILS)}</span> (${(profitRate * 100).toFixed(0)}%${myProfitILS === MINIMUM_FEE_ILS ? ' - מינימום' : ''})<br/>
+          • עלות ב-Bybit: ${formatFiat(budgetNeededILS)}<br/>
           • עמלת רשת: ${networkFee.toFixed(6)} ${selectedCoin.toUpperCase()}<br/>
           • עמלת Bybit: ${bybitFiatFee}%<br/>
-          • שער המטבע: 1 ${selectedCoin.toUpperCase()} = ${rateILS.toFixed(2)} ₪ / $${cryptoPriceUSD.toFixed(2)}<br/>
-          • עוגל לפי חוקי הבורסה: (עוגל לפי חוקי הבורסה)<br/>
+          • שער המטבע: 1 ${selectedCoin.toUpperCase()} = ${rateILS.toFixed(2)} ₪<br/>
         `
-      })
+      });
     }
-    
-    setLoading(false)
   }
 
   const copyToClipboard = () => {
