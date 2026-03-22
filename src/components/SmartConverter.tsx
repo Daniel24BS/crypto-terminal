@@ -177,15 +177,15 @@ export default function SmartConverter() {
     }
   }
 
-  const formatFiat = (amount: number, rate?: number) => {
-    const usdVal = rate ? amount * rate : amount / baseExchangeRate
-    return `${amount.toFixed(2)} ₪ ($${usdVal.toFixed(2)})`
+  const formatFiat = (ilsAmount: number) => {
+    const usdValue = ilsAmount / baseExchangeRate; // baseExchangeRate is USDT/ILS rate
+    return `${ilsAmount.toFixed(2)} ₪ ($${usdValue.toFixed(2)})`
   }
 
   const calculate = async () => {
-    // Assume these variables are pulled from the state/API
+    // Assume these variables are pulled from state/API
     const MINIMUM_FEE_ILS = 10;
-    const feeInput = bybitFiatFee / 100; // e.g., 5.5% -> 0.055
+    const feeInput = Number(bybitFiatFee) / 100; // e.g., 5.5 -> 0.055
     const networkFee = coins.find(c => c.id === selectedCoin)?.networkFee || 0;
     
     // Fetch current crypto price from CoinGecko
