@@ -547,7 +547,7 @@ export default function SmartConverter() {
       {/* Editable Spread Fee Input */}
       <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded-lg">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-red-400">⚠️ עמלת Bybit (פער נסתר):</label>
+          <label className="text-sm font-medium text-red-400">⚠️ Bybit Fee / Spread (%):</label>
           <div className="flex items-center gap-2">
             <input
               type="number"
