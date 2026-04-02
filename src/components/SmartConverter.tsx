@@ -94,7 +94,7 @@ export default function SmartConverter() {
   const [volatility, setVolatility] = useState(0)
   const [rateUSD, setRateUSD] = useState(0)
   const [isRefreshingRate, setIsRefreshingRate] = useState(false)
-  const [bybitFiatFee, setBybitFiatFee] = useState(5.5)
+  const [bybitFiatFee, setBybitFiatFee] = useState<number>(10)
   const [currentCryptoToILSRate, setCurrentCryptoToILSRate] = useState(0)
   const [currentUSDToILSRate, setCurrentUSDToILSRate] = useState(0)
 
@@ -611,12 +611,12 @@ export default function SmartConverter() {
             <input
               type="number"
               value={bybitFiatFee}
-              onChange={(e) => setBybitFiatFee(parseFloat(e.target.value) || 5.5)}
+              onChange={(e) => setBybitFiatFee(parseFloat(e.target.value) || 10)}
               step="0.1"
               min="0"
               max="20"
               className="w-24 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-red-500"
-              placeholder="5.5"
+              placeholder="10"
             />
             <span className="text-sm text-red-400">%</span>
           </div>
