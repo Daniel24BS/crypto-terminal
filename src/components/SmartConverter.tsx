@@ -105,16 +105,59 @@ export default function SmartConverter() {
     }
   }, [balances?.usdToIlsRate])
 
+  // Fetch fresh USD/ILS rate on component mount
+  useEffect(() => {
+    const fetchInitialRate = async () => {
+      try {
+        // Fetch fresh USD/ILS rate from CoinGecko with cache-busting
+        const cacheBuster = Date.now()
+        const response = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils&t=${cacheBuster}`,
+          { cache: 'no-store' }
+        )
+        
+        if (response.ok) {
+          const data = await response.json()
+          const newRate = data.tether?.ils
+          if (newRate && newRate > 0) {
+            setBaseExchangeRate(newRate)
+            console.log('USD/ILS initial rate fetched:', newRate)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching initial USD/ILS rate:', error)
+      }
+    }
+
+    fetchInitialRate()
+  }, [])
+
   // Auto-refresh USD/ILS exchange rate every 60 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (balances?.usdToIlsRate) {
-        setBaseExchangeRate(balances.usdToIlsRate)
+    const interval = setInterval(async () => {
+      try {
+        // Fetch fresh USD/ILS rate from CoinGecko with cache-busting
+        const cacheBuster = Date.now()
+        const response = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils&t=${cacheBuster}`,
+          { cache: 'no-store' }
+        )
+        
+        if (response.ok) {
+          const data = await response.json()
+          const newRate = data.tether?.ils
+          if (newRate && newRate > 0) {
+            setBaseExchangeRate(newRate)
+            console.log('USD/ILS rate auto-refreshed:', newRate)
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-refreshing USD/ILS rate:', error)
       }
     }, 60000) // 60 seconds
 
     return () => clearInterval(interval)
-  }, [balances?.usdToIlsRate])
+  }, [])
 
   // Fetch transactions from KV storage on component mount
   useEffect(() => {
@@ -496,20 +539,36 @@ export default function SmartConverter() {
     setIsRefreshingRate(true)
     
     try {
-      // Fetch fresh USD/ILS rate from CoinGecko
-      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=usd&vs_currencies=ils')
+      // Fetch fresh USD/ILS rate from CoinGecko with cache-busting
+      const cacheBuster = Date.now()
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=ils&t=${cacheBuster}`,
+        { cache: 'no-store' }
+      )
+      
       if (response.ok) {
         const data = await response.json()
-        const newRate = data.usd.ils
+        const newRate = data.tether?.ils
         if (newRate && newRate > 0) {
           setBaseExchangeRate(newRate)
           console.log('USD/ILS rate force-refreshed:', newRate)
+        } else {
+          // Fallback to realistic rate if API returns invalid data
+          const fallbackRate = 3.65
+          setBaseExchangeRate(fallbackRate)
+          console.warn('Invalid rate from API, using fallback:', fallbackRate)
         }
       } else {
-        console.error('Failed to fetch fresh USD/ILS rate')
+        // Fallback to realistic rate if fetch fails
+        const fallbackRate = 3.65
+        setBaseExchangeRate(fallbackRate)
+        console.error('Failed to fetch fresh USD/ILS rate, using fallback:', fallbackRate)
       }
     } catch (error) {
-      console.error('Error force-refreshing USD/ILS rate:', error)
+      // Fallback to realistic rate if error occurs
+      const fallbackRate = 3.65
+      setBaseExchangeRate(fallbackRate)
+      console.error('Error force-refreshing USD/ILS rate, using fallback:', error)
     } finally {
       setIsRefreshingRate(false)
     }
